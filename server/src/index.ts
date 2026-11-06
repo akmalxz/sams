@@ -4,6 +4,7 @@ import { execSync } from 'child_process';
 import { PORT, HOST, SSD_ROOT, isSSDMounted } from './config';
 import { VaultService } from './vault/vaultService';
 import { ProjectService } from './projects/projectService';
+import { ProjectAnalyzer } from './projects/projectAnalyzer';
 import { SerialQueue } from './queue/serialQueue';
 import { StagingGuard } from './sync/stagingGuard';
 import { TaskRouter } from './router/taskRouter';
@@ -274,7 +275,7 @@ app.get('/api/projects', (req: Request, res: Response) => {
 });
 
 app.post('/api/projects', async (req: Request, res: Response) => {
-  const { name, workspacePath, description, currentFocus, status } = req.body;
+  const { name, workspacePath, description, currentFocus, status, initialTasks } = req.body;
   if (!name || !workspacePath) {
     return res.status(400).json({ error: 'name and workspacePath are required' });
   }
@@ -285,8 +286,22 @@ app.post('/api/projects', async (req: Request, res: Response) => {
       description,
       currentFocus,
       status,
+      initialTasks,
     });
     res.status(201).json(project);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/projects/analyze', (req: Request, res: Response) => {
+  const { workspacePath } = req.body;
+  if (!workspacePath) {
+    return res.status(400).json({ error: 'workspacePath is required' });
+  }
+  try {
+    const analysis = ProjectAnalyzer.analyze(workspacePath);
+    res.json(analysis);
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }

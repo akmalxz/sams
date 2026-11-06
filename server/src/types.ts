@@ -119,3 +119,32 @@ export interface Project {
   updatedAt: number;
 }
 
+export interface SuggestedDeliverable {
+  title: string;
+  description?: string;
+  priority: TaskPriority;
+  assignedAgent?: PersonaName;
+  category?: string;
+}
+
+export interface ProjectAnalysisResult {
+  name: string;
+  workspacePath: string;
+  summary: string;
+  currentFocus: string;
+  techStack: string[];
+  latestAccomplishments: string[];
+  suggestedNextDeliverables: SuggestedDeliverable[];
+  healthIssues: string[];
+  gitBranch?: string;
+  uncommittedChanges?: number;
+  lastCommit?: {
+    hash: string;
+    message: string;
+    date: string;
+  };
+  antigravitySessionFound: boolean;
+  antigravityGoal?: string;
+}
+
+

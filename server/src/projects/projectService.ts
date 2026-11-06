@@ -381,6 +381,7 @@ ${tasksMarkdown}
     description?: string;
     currentFocus?: string;
     status?: ProjectStatus;
+    initialTasks?: Array<{ title: string; priority?: TaskPriority; assignedAgent?: PersonaName }>;
   }): Promise<Project> {
     const absPath = path.resolve(data.workspacePath);
     if (!fs.existsSync(absPath)) {
@@ -408,8 +409,19 @@ ${tasksMarkdown}
       [id, data.name, absPath, data.description || '', status, currentFocus, 0, now, now]
     );
 
-    // If Antigravity brain has open tasks, automatically import them!
-    if (antigravity?.openTasks && antigravity.openTasks.length > 0) {
+    // If explicit initial tasks were selected from analysis, create them
+    if (data.initialTasks && data.initialTasks.length > 0) {
+      for (const task of data.initialTasks) {
+        this.createTask(id, {
+          title: task.title,
+          status: 'backlog',
+          priority: task.priority || 'medium',
+          assignedAgent: task.assignedAgent,
+          source: 'manual',
+        });
+      }
+    } else if (antigravity?.openTasks && antigravity.openTasks.length > 0) {
+      // If Antigravity brain has open tasks, automatically import them!
       for (const taskText of antigravity.openTasks) {
         this.createTask(id, {
           title: taskText,
