@@ -13,6 +13,7 @@ import {
 import { ProjectCommandHeader } from './components/projects/ProjectCommandHeader';
 import { PortfolioDrawer } from './components/projects/PortfolioDrawer';
 import { LinkProjectDialog } from './components/projects/LinkProjectDialog';
+import { ReanalyzeProjectModal } from './components/projects/ReanalyzeProjectModal';
 import { StationDrawer } from './components/sams/StationDrawer';
 import { IsometricRoom } from './components/sams/IsometricRoom';
 import { AgentStatesDock } from './components/sams/AgentStatesDock';
@@ -62,6 +63,7 @@ export function App() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [isPortfolioOpen, setIsPortfolioOpen] = useState(false);
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
+  const [reanalyzingProject, setReanalyzingProject] = useState<Project | null>(null);
 
   // Progressive Disclosure: Active Drawer (null on arrival for Zen Room)
   const [activeDrawer, setActiveDrawer] = useState<StationId | null>(null);
@@ -505,6 +507,7 @@ export function App() {
         currentProject={currentProject}
         onOpenPortfolio={() => setIsPortfolioOpen(true)}
         onOpenLinkDialog={() => setIsLinkDialogOpen(true)}
+        onOpenReanalyze={() => setReanalyzingProject(currentProject)}
         theme={themeMode}
         onToggleTheme={toggleTheme}
         ssdMounted={health?.ssdMounted ?? false}
@@ -575,6 +578,7 @@ export function App() {
             currentProject={currentProject}
             onDispatchPlanTask={handleDispatchWhiteboardPlan}
             onUpdateFocus={handleUpdateProjectFocus}
+            onOpenReanalyze={() => setReanalyzingProject(currentProject)}
             isBusy={isDeskBusy}
           />
         )}
@@ -644,6 +648,9 @@ export function App() {
           setIsPortfolioOpen(false);
           setIsLinkDialogOpen(true);
         }}
+        onReanalyzeProject={(p) => {
+          setReanalyzingProject(p);
+        }}
         onToggleTask={handleToggleTask}
       />
 
@@ -654,6 +661,19 @@ export function App() {
         onProjectLinked={(newProj) => {
           fetchProjects();
           setSelectedProjectId(newProj.id);
+        }}
+      />
+
+      {/* 6. Re-Analyze Existing Project Modal */}
+      <ReanalyzeProjectModal
+        isOpen={Boolean(reanalyzingProject)}
+        onClose={() => setReanalyzingProject(null)}
+        project={reanalyzingProject}
+        onAnalysisApplied={(updatedProj) => {
+          fetchProjects();
+          if (selectedProjectId === updatedProj.id) {
+            // Updated
+          }
         }}
       />
     </div>

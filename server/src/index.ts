@@ -353,6 +353,83 @@ app.post('/api/projects/:id/sync', (req: Request, res: Response) => {
   res.json(updated);
 });
 
+app.post('/api/projects/:id/analyze', (req: Request, res: Response) => {
+  const { id } = req.params;
+  const project = projectService.getProject(id);
+  if (!project) {
+    return res.status(404).json({ error: `Project not found: ${id}` });
+  }
+
+  try {
+    const analysis = ProjectAnalyzer.analyze(project.workspacePath);
+
+    // Cross-reference existing tasks to detect duplicates
+    const existingTitles = (project.tasks || []).map((t) => t.title.toLowerCase().trim());
+    const deliverablesWithStatus = analysis.suggestedNextDeliverables.map((d) => {
+      const dTitle = d.title.toLowerCase().trim();
+      const alreadyExists = existingTitles.some((et) => {
+        return et === dTitle || (et.length > 10 && dTitle.includes(et)) || (dTitle.length > 10 && et.includes(dTitle));
+      });
+      return {
+        ...d,
+        alreadyExists,
+      };
+    });
+
+    res.json({
+      projectId: id,
+      project,
+      analysis: {
+        ...analysis,
+        suggestedNextDeliverables: deliverablesWithStatus,
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/projects/:id/apply-analysis', (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { description, currentFocus, importTasks } = req.body;
+
+  const project = projectService.getProject(id);
+  if (!project) {
+    return res.status(404).json({ error: `Project not found: ${id}` });
+  }
+
+  try {
+    const updates: any = {};
+    if (description !== undefined && description.trim()) updates.description = description.trim();
+    if (currentFocus !== undefined && currentFocus.trim()) updates.currentFocus = currentFocus.trim();
+
+    if (Object.keys(updates).length > 0) {
+      projectService.updateProject(id, updates);
+    }
+
+    let importedCount = 0;
+    if (Array.isArray(importTasks) && importTasks.length > 0) {
+      for (const t of importTasks) {
+        if (t && t.title) {
+          projectService.createTask(id, {
+            title: t.title,
+            status: 'backlog',
+            priority: t.priority || 'medium',
+            assignedAgent: t.assignedAgent,
+            source: 'antigravity_plan',
+          });
+          importedCount++;
+        }
+      }
+    }
+
+    const updated = projectService.getProject(id);
+    res.json({ success: true, project: updated, importedCount });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/projects/:id/tasks', (req: Request, res: Response) => {
   const { id } = req.params;
   const tasks = projectService.getTasks(id);

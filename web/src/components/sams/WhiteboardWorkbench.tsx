@@ -6,6 +6,7 @@ interface WhiteboardWorkbenchProps {
   currentProject: Project | null;
   onDispatchPlanTask: (prompt: string) => void;
   onUpdateFocus: (newFocus: string) => void;
+  onOpenReanalyze?: () => void;
   isBusy: boolean;
 }
 
@@ -13,6 +14,7 @@ export const WhiteboardWorkbench: React.FC<WhiteboardWorkbenchProps> = ({
   currentProject,
   onDispatchPlanTask,
   onUpdateFocus,
+  onOpenReanalyze,
   isBusy,
 }) => {
   const [focusInput, setFocusInput] = useState(currentProject?.currentFocus || '');
@@ -87,6 +89,45 @@ export const WhiteboardWorkbench: React.FC<WhiteboardWorkbenchProps> = ({
           </button>
         </form>
       </div>
+
+      {/* Codebase Pulse & AI Inspection */}
+      {currentProject && (
+        <div className="p-4 rounded-xl bg-surface border border-line shadow-xs space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-blue font-bold">⚡</span>
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-ink">
+                Codebase Pulse & AI Inspection
+              </h3>
+            </div>
+            {onOpenReanalyze && (
+              <button
+                type="button"
+                onClick={onOpenReanalyze}
+                className="px-3 py-1.5 rounded-lg bg-blue text-white text-xs font-semibold hover:opacity-95 transition-opacity cursor-pointer flex items-center gap-1.5 shadow-xs"
+              >
+                <span>⚡</span> Run Deep Pulse Analysis
+              </button>
+            )}
+          </div>
+
+          <div className="rounded-lg bg-canvas p-3 border border-line space-y-2 text-xs">
+            <div className="flex items-center justify-between font-mono text-ink-muted">
+              <span>Branch: <strong className="text-ink">{currentProject.git?.branch || 'main'}</strong></span>
+              <span className={`font-semibold ${
+                (currentProject.git?.uncommittedChanges ?? 0) === 0 ? 'text-emerald-500' : 'text-amber-500'
+              }`}>
+                {(currentProject.git?.uncommittedChanges ?? 0) === 0 ? '✓ Clean Tree' : `▲ ${currentProject.git?.uncommittedChanges} uncommitted changes`}
+              </span>
+            </div>
+            {currentProject.git?.lastCommitMessage && (
+              <div className="text-[11px] font-mono text-ink truncate border-t border-line/60 pt-2">
+                <span className="text-ink-muted">Last Commit:</span> {currentProject.git.lastCommitHash} · {currentProject.git.lastCommitMessage}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* 2. Antigravity Brain Session Integration */}
       {currentProject?.antigravity ? (

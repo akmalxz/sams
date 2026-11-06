@@ -113,6 +113,7 @@ export interface SuggestedDeliverable {
   priority: TaskPriority;
   assignedAgent?: PersonaId;
   category?: string;
+  alreadyExists?: boolean;
 }
 
 export interface ProjectAnalysisResult {

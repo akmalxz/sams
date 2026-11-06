@@ -6,6 +6,7 @@ interface ProjectCommandHeaderProps {
   currentProject: Project | null;
   onOpenPortfolio: () => void;
   onOpenLinkDialog: () => void;
+  onOpenReanalyze?: () => void;
   theme: 'light' | 'dark';
   onToggleTheme: () => void;
   ssdMounted: boolean;
@@ -16,6 +17,7 @@ export const ProjectCommandHeader: React.FC<ProjectCommandHeaderProps> = ({
   currentProject,
   onOpenPortfolio,
   onOpenLinkDialog,
+  onOpenReanalyze,
   theme,
   onToggleTheme,
   ssdMounted,
@@ -65,6 +67,18 @@ export const ProjectCommandHeader: React.FC<ProjectCommandHeaderProps> = ({
             ▾
           </span>
         </button>
+
+        {currentProject && onOpenReanalyze && (
+          <button
+            type="button"
+            onClick={onOpenReanalyze}
+            className="px-2.5 py-1.5 rounded-full border border-line bg-elevated/80 hover:bg-surface hover:border-blue/50 text-xs font-medium text-ink-muted hover:text-blue transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
+            title="Auto-Analyze & Sync Codebase Pulse"
+          >
+            <span className="text-blue font-bold">⚡</span>
+            <span className="hidden md:inline text-[11px] font-semibold">Pulse</span>
+          </button>
+        )}
 
         <button
           type="button"

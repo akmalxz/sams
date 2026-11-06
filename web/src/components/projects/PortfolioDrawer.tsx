@@ -8,6 +8,7 @@ interface PortfolioDrawerProps {
   selectedProjectId: string | null;
   onSelectProject: (projectId: string) => void;
   onOpenLinkDialog: () => void;
+  onReanalyzeProject?: (project: Project) => void;
   onToggleTask: (projectId: string, task: ProjectTask) => void;
 }
 
@@ -18,6 +19,7 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({
   selectedProjectId,
   onSelectProject,
   onOpenLinkDialog,
+  onReanalyzeProject,
   onToggleTask,
 }) => {
   if (!isOpen) return null;
@@ -170,8 +172,23 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({
                     </div>
                   )}
 
-                  <div className="mt-3 pt-2 flex justify-end text-xs font-semibold text-blue">
-                    <span>{isSelected ? 'Currently Viewing →' : 'Switch Room to this Project →'}</span>
+                  <div className="mt-3 pt-2 flex items-center justify-between text-xs">
+                    {onReanalyzeProject ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onReanalyzeProject(project);
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-elevated border border-line text-[11px] font-semibold text-ink-muted hover:text-blue hover:border-blue transition-colors cursor-pointer flex items-center gap-1.5"
+                        title="Auto-analyze and refresh pulse for this codebase"
+                      >
+                        <span className="text-blue font-bold">⚡</span> Re-Analyze
+                      </button>
+                    ) : (
+                      <div />
+                    )}
+                    <span className="font-semibold text-blue">{isSelected ? 'Currently Viewing →' : 'Switch Room to this Project →'}</span>
                   </div>
                 </div>
               );
