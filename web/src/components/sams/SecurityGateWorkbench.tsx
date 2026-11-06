@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
+import { Project } from '../../types/sams';
 import { BlackDot } from '../ui/BlackDot';
 
 interface SecurityGateWorkbenchProps {
+  currentProject: Project | null;
   health: {
     ssdMounted: boolean;
     ssdPath: string;
@@ -14,11 +16,14 @@ interface SecurityGateWorkbenchProps {
     stagingActiveCount?: number;
   } | null;
   onRefreshHealth: () => void;
+  onRefreshProject?: () => void;
 }
 
 export const SecurityGateWorkbench: React.FC<SecurityGateWorkbenchProps> = ({
+  currentProject,
   health,
   onRefreshHealth,
+  onRefreshProject,
 }) => {
   const [conflicts, setConflicts] = useState<string[]>([]);
   const [resolving, setResolving] = useState<string | null>(null);
@@ -54,125 +59,167 @@ export const SecurityGateWorkbench: React.FC<SecurityGateWorkbenchProps> = ({
     }
   };
 
+  const isGitClean = (currentProject?.git?.uncommittedChanges ?? 0) === 0;
+  const isGitRepo = currentProject?.git?.isGitRepo ?? false;
+
   return (
     <div className="space-y-5">
+      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-line">
         <div>
-          <h2 className="text-lg font-serif font-medium text-ink tracking-tight">
-            Security Gate · Access Control & Sync Guard
-          </h2>
-          <p className="text-xs text-ink-muted">
-            Enforces atomic <code className="font-mono text-ink">staging/ → vault/</code> commits, <code className="font-mono text-ink">lsof</code> Drive lock checks, and 8 GB RAM limits
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-bold text-ink tracking-tight">
+              Security Gate · Project Health & Release Gate
+            </h2>
+            {currentProject && (
+              <span className="text-xs font-mono px-2 py-0.5 rounded bg-blue/10 text-blue font-semibold">
+                {currentProject.name}
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-ink-muted mt-0.5">
+            Git working-tree hygiene, release blocker checks, and staging conflict resolution.
           </p>
         </div>
-
         <BlackDot
-          state={health?.ssdMounted && conflicts.length === 0 ? 'synced' : 'error'}
-          label={health?.ssdMounted ? 'Gate Secure' : 'SSD Disconnected'}
+          pulsing={!isGitClean || (health?.driveConflictsCount ?? 0) > 0}
+          label={isGitClean ? 'Gate Clear' : 'Uncommitted Changes'}
         />
       </div>
 
-      {/* 3 Security Gate Checkpoints */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-        {/* Checkpoint 1: External SSD & ExFAT Guard */}
-        <div className="p-4 rounded-xl bg-surface border border-line space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono uppercase text-ink-muted">Checkpoint 01</span>
-            <BlackDot state={health?.ssdMounted ? 'synced' : 'error'} size="sm" />
+      {/* 1. Git Working-Tree Health Gate */}
+      <div className="p-4 rounded-xl bg-surface border border-line shadow-xs space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full ${isGitClean ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-ink">
+              Git Repository Health
+            </h3>
           </div>
-          <div className="text-sm font-serif font-semibold text-ink">
-            External SSD Isolation
-          </div>
-          <div className="text-xs font-mono text-ink-muted space-y-1 pt-1">
-            <div>Mount: <span className="text-ink">{health?.ssdMounted ? 'Connected' : 'Unmounted'}</span></div>
-            <div>Free Space: <span className="text-ink">{health?.freeSpaceGB ?? 0} GB</span> / {health?.totalSpaceGB ?? 0} GB</div>
-            <div>ExFAT Guard: <span className="text-olive">dot_clean + --copies active</span></div>
-          </div>
+          {onRefreshProject && (
+            <button
+              type="button"
+              onClick={onRefreshProject}
+              className="text-[11px] text-blue hover:underline cursor-pointer"
+            >
+              Re-scan Working Tree
+            </button>
+          )}
         </div>
 
-        {/* Checkpoint 2: 8 GB M1 Unified Memory Mutex */}
-        <div className="p-4 rounded-xl bg-surface border border-line space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono uppercase text-ink-muted">Checkpoint 02</span>
-            <BlackDot state={health?.currentRunningJobId ? 'executing' : 'idle'} size="sm" />
-          </div>
-          <div className="text-sm font-serif font-semibold text-ink">
-            8 GB RAM Serial Mutex
-          </div>
-          <div className="text-xs font-mono text-ink-muted space-y-1 pt-1">
-            <div>Max Concurrency: <span className="text-ink font-semibold">1 job (Strict)</span></div>
-            <div>Server Footprint: <span className="text-ink">{health?.memoryUsageMB ?? 24} MB RSS</span></div>
-            <div>Turnstile Queue: <span className="text-ink">{health?.activeQueueLength ?? 0} waiting</span></div>
-          </div>
-        </div>
+        {isGitRepo ? (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+            <div className="p-3 rounded-lg bg-canvas border border-line space-y-1">
+              <span className="text-[10px] font-mono uppercase text-ink-muted">Active Branch</span>
+              <p className="font-mono font-bold text-ink">{currentProject?.git?.branch || 'main'}</p>
+            </div>
 
-        {/* Checkpoint 3: StagingGuard & Google Drive Lock Check */}
-        <div className="p-4 rounded-xl bg-surface border border-line space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono uppercase text-ink-muted">Checkpoint 03</span>
-            <BlackDot state={conflicts.length === 0 ? 'synced' : 'error'} size="sm" />
+            <div className="p-3 rounded-lg bg-canvas border border-line space-y-1">
+              <span className="text-[10px] font-mono uppercase text-ink-muted">Uncommitted Files</span>
+              <p className={`font-mono font-bold ${isGitClean ? 'text-emerald-500' : 'text-amber-500'}`}>
+                {currentProject?.git?.uncommittedChanges ?? 0} {isGitClean ? '(Clean Tree)' : 'dirty files'}
+              </p>
+            </div>
+
+            <div className="p-3 rounded-lg bg-canvas border border-line space-y-1">
+              <span className="text-[10px] font-mono uppercase text-ink-muted">Last Commit</span>
+              <p className="font-mono font-semibold text-ink truncate">
+                {currentProject?.git?.lastCommitHash ? `#${currentProject.git.lastCommitHash}` : 'N/A'}
+              </p>
+              <p className="text-[10px] text-ink-muted truncate">
+                {currentProject?.git?.lastCommitMessage || 'No commits yet'}
+              </p>
+            </div>
           </div>
-          <div className="text-sm font-serif font-semibold text-ink">
-            Staging & DriveFS Gate
+        ) : (
+          <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-700 dark:text-amber-400">
+            This workspace folder is not currently a Git repository. Run <code className="font-mono">git init</code> to enable branch and dirty-file tracking.
           </div>
-          <div className="text-xs font-mono text-ink-muted space-y-1 pt-1">
-            <div>Active Scratchpads: <span className="text-ink">{health?.stagingActiveCount ?? 0} in staging/</span></div>
-            <div>POSIX Lock Check: <span className="text-olive">lsof pre-commit active</span></div>
-            <div>Sync Conflicts: <span className={conflicts.length === 0 ? 'text-olive' : 'text-terracotta font-bold'}>{conflicts.length} detected</span></div>
+        )}
+      </div>
+
+      {/* 2. Release Readiness Checklist */}
+      <div className="p-4 rounded-xl bg-surface border border-line shadow-xs space-y-3">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-ink">
+          Release Readiness Gate
+        </h3>
+
+        <div className="space-y-2 text-xs">
+          <div className="flex items-center justify-between p-2.5 rounded-lg bg-canvas border border-line">
+            <div className="flex items-center gap-2">
+              <span className={isGitClean ? 'text-emerald-500 font-bold' : 'text-amber-500'}>
+                {isGitClean ? '✓' : '▲'}
+              </span>
+              <span className="text-ink">Git Working Tree Clean</span>
+            </div>
+            <span className="font-mono text-[11px] text-ink-muted">
+              {isGitClean ? 'Ready to commit/push' : `${currentProject?.git?.uncommittedChanges} uncommitted files`}
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between p-2.5 rounded-lg bg-canvas border border-line">
+            <div className="flex items-center gap-2">
+              <span className={health?.ssdMounted ? 'text-emerald-500 font-bold' : 'text-red-500'}>
+                {health?.ssdMounted ? '✓' : '✕'}
+              </span>
+              <span className="text-ink">External SSD Vault Storage</span>
+            </div>
+            <span className="font-mono text-[11px] text-ink-muted">
+              {health?.ssdMounted ? `Mounted (${health.freeSpaceGB} GB free)` : 'Offline'}
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between p-2.5 rounded-lg bg-canvas border border-line">
+            <div className="flex items-center gap-2">
+              <span className={conflicts.length === 0 ? 'text-emerald-500 font-bold' : 'text-red-500 font-bold'}>
+                {conflicts.length === 0 ? '✓' : '✕'}
+              </span>
+              <span className="text-ink">Google Drive Sync Conflicts</span>
+            </div>
+            <span className="font-mono text-[11px] text-ink-muted">
+              {conflicts.length === 0 ? 'Zero conflicts' : `${conflicts.length} conflicted file(s)`}
+            </span>
           </div>
         </div>
       </div>
 
-      {/* Conflict Resolution Table */}
-      <div className="p-4 rounded-xl bg-surface border border-line space-y-3">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-mono font-bold uppercase text-ink">
-            Google Drive Conflict Scanner (`*(1).md`)
-          </span>
-          <button
-            type="button"
-            onClick={() => {
-              fetchConflicts();
-              onRefreshHealth();
-            }}
-            className="px-2.5 py-1 rounded bg-canvas border border-line text-[11px] font-mono text-ink hover:bg-elevated cursor-pointer"
-          >
-            Re-Scan Vault
-          </button>
-        </div>
-
-        {conflicts.length === 0 ? (
-          <div className="p-6 rounded-lg bg-canvas border border-line/70 text-center text-xs font-mono text-ink-muted">
-            ✓ Zero Google Drive lock duplicates (`*(1).md`) found inside <span className="text-ink">/Volumes/Akmal SSD/PersonalAI/vault</span>.
+      {/* 3. Google Drive Conflicts Resolver */}
+      {conflicts.length > 0 && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-red-600 dark:text-red-400">
+              Active Sync Conflicts Detected ({conflicts.length})
+            </h3>
+            <span className="text-[10px] text-red-600 dark:text-red-400">Google Drive Duplicate Staging</span>
           </div>
-        ) : (
-          <div className="divide-y divide-line rounded-lg bg-canvas border border-line">
-            {conflicts.map((cPath) => (
-              <div key={cPath} className="p-3 flex items-center justify-between gap-3 text-xs font-mono">
-                <span className="text-terracotta font-medium truncate">{cPath}</span>
-                <div className="flex items-center gap-2 shrink-0">
+
+          <div className="space-y-2 max-h-40 overflow-y-auto">
+            {conflicts.map((file) => (
+              <div key={file} className="flex items-center justify-between gap-3 p-2 rounded bg-surface border border-line text-xs font-mono">
+                <span className="truncate text-ink">{file}</span>
+                <div className="flex items-center gap-1.5 shrink-0">
                   <button
                     type="button"
-                    disabled={resolving === cPath}
-                    onClick={() => handleResolveConflict(cPath, 'archive')}
-                    className="px-2.5 py-1 rounded bg-surface border border-line text-ink hover:bg-elevated cursor-pointer"
+                    disabled={resolving === file}
+                    onClick={() => handleResolveConflict(file, 'archive')}
+                    className="px-2 py-1 rounded bg-elevated hover:bg-line text-[11px] text-ink cursor-pointer"
                   >
-                    Archive to _Archive/
+                    Archive
                   </button>
                   <button
                     type="button"
-                    disabled={resolving === cPath}
-                    onClick={() => handleResolveConflict(cPath, 'delete')}
-                    className="px-2.5 py-1 rounded bg-terracotta text-canvas hover:opacity-90 cursor-pointer"
+                    disabled={resolving === file}
+                    onClick={() => handleResolveConflict(file, 'delete')}
+                    className="px-2 py-1 rounded bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 text-[11px] cursor-pointer"
                   >
-                    Delete Duplicate
+                    Delete
                   </button>
                 </div>
               </div>
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

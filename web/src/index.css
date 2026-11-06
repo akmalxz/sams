@@ -1,24 +1,92 @@
 @import "tailwindcss";
 
+:root {
+  color-scheme: light dark;
+
+  /* SAMS Light Theme: Crisp White & SAMS Royal Blue (#2563EB) */
+  --canvas-light: #F8FAFC;
+  --surface-light: #FFFFFF;
+  --elevated-light: #F1F5F9;
+  --ink-light: #0F172A;
+  --ink-muted-light: #475569;
+  --ink-subtle-light: #94A3B8;
+  --line-light: #E2E8F0;
+  --brand-blue-light: #2563EB;
+  --brand-blue-soft-light: #EFF6FF;
+
+  /* SAMS Dark Theme: Deep Midnight Slate & Electric Blue (#3B82F6) */
+  --canvas-dark: #0B0F19;
+  --surface-dark: #111827;
+  --elevated-dark: #1E293B;
+  --ink-dark: #F8FAFC;
+  --ink-muted-dark: #94A3B8;
+  --ink-subtle-dark: #64748B;
+  --line-dark: #1F2937;
+  --brand-blue-dark: #3B82F6;
+  --brand-blue-soft-dark: rgba(59, 130, 246, 0.16);
+
+  /* Semantic Variables with light-dark() */
+  --color-canvas: light-dark(var(--canvas-light), var(--canvas-dark));
+  --color-surface: light-dark(var(--surface-light), var(--surface-dark));
+  --color-elevated: light-dark(var(--elevated-light), var(--elevated-dark));
+  --color-ink: light-dark(var(--ink-light), var(--ink-dark));
+  --color-ink-muted: light-dark(var(--ink-muted-light), var(--ink-muted-dark));
+  --color-ink-subtle: light-dark(var(--ink-subtle-light), var(--ink-subtle-dark));
+  --color-line: light-dark(var(--line-light), var(--line-dark));
+  --color-blue: light-dark(var(--brand-blue-light), var(--brand-blue-dark));
+  --color-blue-soft: light-dark(var(--brand-blue-soft-light), var(--brand-blue-soft-dark));
+
+  scrollbar-color: var(--color-ink-subtle) var(--color-canvas);
+  scrollbar-width: thin;
+}
+
+/* User override via data-theme attribute or meta tag */
+[data-theme="light"], :root:has(> head > meta[name="color-scheme"][content="light"]) {
+  color-scheme: light;
+  --color-canvas: var(--canvas-light);
+  --color-surface: var(--surface-light);
+  --color-elevated: var(--elevated-light);
+  --color-ink: var(--ink-light);
+  --color-ink-muted: var(--ink-muted-light);
+  --color-ink-subtle: var(--ink-subtle-light);
+  --color-line: var(--line-light);
+  --color-blue: var(--brand-blue-light);
+  --color-blue-soft: var(--brand-blue-soft-light);
+}
+
+[data-theme="dark"], :root:has(> head > meta[name="color-scheme"][content="dark"]) {
+  color-scheme: dark;
+  --color-canvas: var(--canvas-dark);
+  --color-surface: var(--surface-dark);
+  --color-elevated: var(--elevated-dark);
+  --color-ink: var(--ink-dark);
+  --color-ink-muted: var(--ink-muted-dark);
+  --color-ink-subtle: var(--ink-subtle-dark);
+  --color-line: var(--line-dark);
+  --color-blue: var(--brand-blue-dark);
+  --color-blue-soft: var(--brand-blue-soft-dark);
+}
+
 @theme {
-  --color-canvas: #F5F2EB;
-  --color-surface: #EFECE4;
-  --color-elevated: #FAF8F4;
+  --color-canvas: var(--color-canvas);
+  --color-surface: var(--color-surface);
+  --color-elevated: var(--color-elevated);
 
-  --color-ink: #1C1917;
-  --color-ink-muted: #57534E;
-  --color-ink-subtle: #8C857B;
+  --color-ink: var(--color-ink);
+  --color-ink-muted: var(--color-ink-muted);
+  --color-ink-subtle: var(--color-ink-subtle);
 
-  --color-line: #D8D1C5;
+  --color-line: var(--color-line);
+  --color-blue: var(--color-blue);
+  --color-blue-soft: var(--color-blue-soft);
 
-  --color-terracotta: #B85D3B;
-  --color-olive: #5F6F52;
-  --color-ochre: #C28F42;
-  --color-clay: #8A6A58;
-  --color-slate: #5C6468;
+  --color-terracotta: #DC2626;
+  --color-olive: #16A34A;
+  --color-ochre: #D97706;
+  --color-clay: #9333EA;
+  --color-slate: #0284C7;
 
   --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-serif: 'Newsreader', Georgia, Cambria, serif;
   --font-mono: 'JetBrains Mono', Menlo, Monaco, Consolas, monospace;
 }
 
@@ -116,7 +184,13 @@
   white-space: nowrap !important;
 }
 
-/* Custom scrollbars adhering strictly to earth palette */
+/* Accessible Native Dialog Backdrop Styling */
+dialog::backdrop {
+  background: rgba(11, 15, 25, 0.6);
+  backdrop-filter: blur(4px);
+}
+
+/* Custom Scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

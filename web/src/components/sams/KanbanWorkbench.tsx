@@ -1,211 +1,237 @@
 import React, { useState } from 'react';
-import { KanbanWorkItem } from '../../types/sams';
+import { Project, ProjectTask, ProjectTaskStatus, TaskPriority, PersonaId } from '../../types/sams';
 import { BlackDot } from '../ui/BlackDot';
 
 interface KanbanWorkbenchProps {
-  items: KanbanWorkItem[];
-  onAddItem: (title: string, prompt: string, persona: 'architect' | 'data-engineer' | 'archivist', mode: 'auto' | 'plan') => void;
-  onDispatchItem: (item: KanbanWorkItem) => void;
-  onMoveItemColumn: (id: string, col: KanbanWorkItem['column']) => void;
+  currentProject: Project | null;
+  tasks: ProjectTask[];
+  onAddTask: (title: string, priority: TaskPriority, assignedAgent?: PersonaId) => void;
+  onUpdateTaskStatus: (taskId: string, status: ProjectTaskStatus) => void;
+  onDeleteTask: (taskId: string) => void;
+  onDispatchTaskToAgent: (task: ProjectTask) => void;
   isBusy: boolean;
 }
 
-const COLUMNS: Array<{ id: KanbanWorkItem['column']; label: string; badgeColor: string }> = [
-  { id: 'backlog', label: 'Backlog', badgeColor: 'border-ochre/60 bg-ochre/10 text-ink' },
-  { id: 'in_progress', label: 'In Progress', badgeColor: 'border-terracotta/60 bg-terracotta/10 text-ink' },
-  { id: 'review', label: 'Review (Staged)', badgeColor: 'border-olive/60 bg-olive/10 text-ink' },
-  { id: 'done', label: 'Done (In Vault)', badgeColor: 'border-line bg-canvas text-ink-muted' },
+const COLUMNS: Array<{ id: ProjectTaskStatus; label: string; badge: string }> = [
+  { id: 'backlog', label: 'Backlog', badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' },
+  { id: 'in_progress', label: 'In Progress', badge: 'bg-blue/10 text-blue border-blue/20' },
+  { id: 'review', label: 'Review', badge: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20' },
+  { id: 'done', label: 'Done', badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' },
 ];
 
 export const KanbanWorkbench: React.FC<KanbanWorkbenchProps> = ({
-  items,
-  onAddItem,
-  onDispatchItem,
-  onMoveItemColumn,
+  currentProject,
+  tasks,
+  onAddTask,
+  onUpdateTaskStatus,
+  onDeleteTask,
+  onDispatchTaskToAgent,
   isBusy,
 }) => {
-  const [title, setTitle] = useState('');
-  const [prompt, setPrompt] = useState('');
-  const [persona, setPersona] = useState<'architect' | 'data-engineer' | 'archivist'>('architect');
-  const [mode, setMode] = useState<'auto' | 'plan'>('auto');
+  const [newTitle, setNewTitle] = useState('');
+  const [priority, setPriority] = useState<TaskPriority>('medium');
+  const [assignedAgent, setAssignedAgent] = useState<PersonaId>('architect');
+  const [showAddForm, setShowAddForm] = useState(false);
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !prompt.trim()) return;
-    onAddItem(title.trim(), prompt.trim(), persona, mode);
-    setTitle('');
-    setPrompt('');
+    if (!newTitle.trim()) return;
+    onAddTask(newTitle.trim(), priority, assignedAgent);
+    setNewTitle('');
+    setShowAddForm(false);
+  };
+
+  const nextStatus = (curr: ProjectTaskStatus): ProjectTaskStatus => {
+    if (curr === 'backlog') return 'in_progress';
+    if (curr === 'in_progress') return 'review';
+    if (curr === 'review') return 'done';
+    return 'backlog';
   };
 
   return (
     <div className="space-y-5">
+      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-line">
         <div>
-          <h2 className="text-lg font-serif font-medium text-ink tracking-tight">
-            Kanban Wall · Work Items
-          </h2>
-          <p className="text-xs text-ink-muted">
-            Assign cards to an agent persona to dispatch them to <span className="font-mono text-ink">Desk 01 (SerialQueue)</span>
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-bold text-ink tracking-tight">
+              Kanban Wall · Project Deliverables
+            </h2>
+            {currentProject && (
+              <span className="text-xs font-mono px-2 py-0.5 rounded bg-blue/10 text-blue font-semibold">
+                {currentProject.name}
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-ink-muted mt-0.5">
+            Deliverable pipeline: Backlog → In Progress → Review → Done.
           </p>
         </div>
-        <BlackDot state={isBusy ? 'executing' : 'idle'} label={`${items.length} Total Cards`} />
+        <div className="flex items-center gap-3">
+          <BlackDot pulsing={isBusy} label={`${tasks.length} Deliverables`} />
+          <button
+            type="button"
+            onClick={() => setShowAddForm(!showAddForm)}
+            className="px-3 py-1.5 rounded-lg bg-blue text-white text-xs font-semibold hover:opacity-95 transition-opacity cursor-pointer flex items-center gap-1 shadow-sm"
+          >
+            <span>+</span> Add Deliverable
+          </button>
+        </div>
       </div>
 
-      {/* Add Work Item Form (Accessible Labels per modern-web-guidance) */}
-      <form onSubmit={handleCreate} className="p-4 rounded-xl bg-surface border border-line space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {/* Add Task Collapsible Form */}
+      {showAddForm && (
+        <form onSubmit={handleCreate} className="p-4 rounded-xl bg-surface border border-line shadow-xs space-y-3">
           <div>
-            <label htmlFor="kanban-title" className="block text-[11px] font-mono uppercase text-ink-muted mb-1">
-              Work Item Title
+            <label className="block text-xs font-semibold uppercase tracking-wider text-ink-muted mb-1">
+              Deliverable Title
             </label>
             <input
-              id="kanban-title"
               type="text"
               required
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g., Audit DuckDB Weekly Metrics"
-              className="w-full bg-canvas border border-line rounded px-3 py-1.5 text-xs font-mono text-ink focus:outline-none focus:border-ink"
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              placeholder="e.g. Implement user JWT session refresh middleware..."
+              className="w-full rounded-lg border border-line bg-canvas px-3 py-2 text-xs text-ink placeholder:text-ink-subtle focus:border-blue focus:outline-none"
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label htmlFor="kanban-persona" className="block text-[11px] font-mono uppercase text-ink-muted mb-1">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-ink-muted mb-1">
+                Priority
+              </label>
+              <select
+                value={priority}
+                onChange={(e) => setPriority(e.target.value as TaskPriority)}
+                className="w-full rounded-lg border border-line bg-canvas px-3 py-2 text-xs text-ink focus:border-blue focus:outline-none cursor-pointer"
+              >
+                <option value="low">Low Priority</option>
+                <option value="medium">Medium Priority</option>
+                <option value="high">High Priority</option>
+                <option value="urgent">Urgent</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-ink-muted mb-1">
                 Assigned Agent
               </label>
               <select
-                id="kanban-persona"
-                value={persona}
-                onChange={(e) => setPersona(e.target.value as any)}
-                className="w-full bg-canvas border border-line rounded px-2.5 py-1.5 text-xs font-mono text-ink focus:outline-none focus:border-ink"
+                value={assignedAgent}
+                onChange={(e) => setAssignedAgent(e.target.value as PersonaId)}
+                className="w-full rounded-lg border border-line bg-canvas px-3 py-2 text-xs text-ink focus:border-blue focus:outline-none cursor-pointer"
               >
-                <option value="architect">Architect (Pro)</option>
-                <option value="data-engineer">Data Engineer (Pro)</option>
-                <option value="archivist">Archivist (Flash)</option>
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="kanban-mode" className="block text-[11px] font-mono uppercase text-ink-muted mb-1">
-                Execution Mode
-              </label>
-              <select
-                id="kanban-mode"
-                value={mode}
-                onChange={(e) => setMode(e.target.value as any)}
-                className="w-full bg-canvas border border-line rounded px-2.5 py-1.5 text-xs font-mono text-ink focus:outline-none focus:border-ink"
-              >
-                <option value="auto">Auto (Execute)</option>
-                <option value="plan">Plan (Read-Only)</option>
+                <option value="architect">Architect (Gemini Pro)</option>
+                <option value="data-engineer">Data Engineer (DuckDB/Python)</option>
+                <option value="archivist">Archivist (Markdown Vault)</option>
               </select>
             </div>
           </div>
-        </div>
 
-        <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-end">
-          <div className="flex-1">
-            <label htmlFor="kanban-prompt" className="block text-[11px] font-mono uppercase text-ink-muted mb-1">
-              Agent Task Prompt
-            </label>
-            <input
-              id="kanban-prompt"
-              type="text"
-              required
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Describe exact task instructions for the agent..."
-              className="w-full bg-canvas border border-line rounded px-3 py-1.5 text-xs font-mono text-ink focus:outline-none focus:border-ink"
-            />
-          </div>
-          <button
-            type="submit"
-            className="px-4 py-1.5 rounded bg-ink text-canvas text-xs font-mono hover:opacity-90 cursor-pointer shrink-0 min-h-[32px]"
-          >
-            + Add to Backlog
-          </button>
-        </div>
-      </form>
-
-      {/* 4-Column Kanban Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {COLUMNS.map((col) => {
-          const colItems = items.filter((i) => i.column === col.id);
-          return (
-            <div
-              key={col.id}
-              className="rounded-xl bg-surface/80 border border-line p-3 flex flex-col justify-between min-h-[300px]"
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setShowAddForm(false)}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium text-ink-muted hover:bg-elevated cursor-pointer"
             >
-              <div className="space-y-2.5">
-                <div className="flex items-center justify-between pb-2 border-b border-line/70">
-                  <span className="text-xs font-mono font-bold uppercase text-ink">
-                    {col.label}
-                  </span>
-                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${col.badgeColor}`}>
-                    {col.id === 'in_progress' && colItems.length > 0 ? 'LIVE' : colItems.length}
-                  </span>
-                </div>
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-1.5 rounded-lg bg-blue text-white text-xs font-semibold hover:opacity-95 cursor-pointer shadow-sm"
+            >
+              Save Deliverable
+            </button>
+          </div>
+        </form>
+      )}
 
-                {colItems.length === 0 ? (
-                  <div className="py-8 text-center text-[11px] font-mono text-ink-subtle">
-                    No cards in {col.label}
+      {/* 4-Column Board */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        {COLUMNS.map((col) => {
+          const colTasks = tasks.filter((t) => t.status === col.id);
+
+          return (
+            <div key={col.id} className="rounded-xl border border-line bg-surface/60 p-3 flex flex-col min-h-[320px]">
+              {/* Column Header */}
+              <div className="flex items-center justify-between pb-2 mb-2 border-b border-line">
+                <span className="text-xs font-semibold text-ink">{col.label}</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${col.badge}`}>
+                  {colTasks.length}
+                </span>
+              </div>
+
+              {/* Tasks List */}
+              <div className="space-y-2 flex-1 overflow-y-auto">
+                {colTasks.length === 0 ? (
+                  <div className="h-24 flex items-center justify-center text-[11px] text-ink-subtle italic">
+                    Empty column
                   </div>
                 ) : (
-                  <div className="space-y-2.5">
-                    {colItems.map((card) => (
-                      <div
-                        key={card.id}
-                        className="p-3 rounded-lg bg-elevated border border-line shadow-2xs space-y-2"
-                      >
-                        <div className="flex items-start justify-between gap-1.5">
-                          <span className="text-xs font-sans font-semibold text-ink leading-snug">
-                            {card.title}
-                          </span>
-                          <span className="text-[10px] font-mono uppercase px-1.5 py-0.2 rounded bg-surface border border-line text-ink-muted shrink-0">
-                            {card.persona}
-                          </span>
-                        </div>
-
-                        <p className="text-[11px] font-mono text-ink-muted line-clamp-2">
-                          {card.prompt}
+                  colTasks.map((task) => (
+                    <div
+                      key={task.id}
+                      className="rounded-lg border border-line bg-surface p-3 shadow-xs hover:border-blue/50 transition-all space-y-2"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <p className={`text-xs text-ink font-medium leading-snug ${task.status === 'done' ? 'line-through text-ink-muted' : ''}`}>
+                          {task.title.replace(/\*\*/g, '')}
                         </p>
-
-                        {card.resultSnippet && (
-                          <div className="p-1.5 rounded bg-canvas border border-line/60 text-[10px] font-mono text-ink-muted line-clamp-2">
-                            {card.resultSnippet}
-                          </div>
-                        )}
-
-                        <div className="pt-1 flex flex-wrap items-center justify-between gap-1">
-                          {card.column === 'backlog' && (
-                            <button
-                              type="button"
-                              onClick={() => onDispatchItem(card)}
-                              className="w-full py-1 px-2 rounded bg-ink text-canvas text-[11px] font-mono hover:opacity-90 cursor-pointer flex items-center justify-center gap-1.5"
-                            >
-                              <span>Assign to Desk 01 →</span>
-                            </button>
-                          )}
-
-                          {card.column === 'review' && (
-                            <button
-                              type="button"
-                              onClick={() => onMoveItemColumn(card.id, 'done')}
-                              className="w-full py-1 px-2 rounded bg-olive text-canvas text-[11px] font-mono hover:opacity-90 cursor-pointer"
-                            >
-                              Approve into Vault ✓
-                            </button>
-                          )}
-
-                          {card.column === 'done' && (
-                            <span className="text-[10px] font-mono text-olive font-semibold">
-                              ● Committed to Vault
-                            </span>
-                          )}
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => onDeleteTask(task.id)}
+                          className="text-ink-subtle hover:text-red-500 transition-colors cursor-pointer text-xs leading-none"
+                          title="Delete deliverable"
+                        >
+                          ✕
+                        </button>
                       </div>
-                    ))}
-                  </div>
+
+                      {/* Meta badges */}
+                      <div className="flex flex-wrap items-center justify-between gap-1 pt-1 border-t border-line/50 text-[10px] font-mono">
+                        <span className={`px-1.5 py-0.2 rounded font-semibold ${
+                          task.priority === 'urgent'
+                            ? 'bg-red-500/10 text-red-600 dark:text-red-400'
+                            : task.priority === 'high'
+                            ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                            : 'bg-elevated text-ink-muted'
+                        }`}>
+                          {task.priority.toUpperCase()}
+                        </span>
+
+                        {task.assignedAgent && (
+                          <span className="text-ink-muted capitalize">
+                            🤖 {task.assignedAgent.replace('-', ' ')}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="flex items-center justify-between gap-1.5 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => onUpdateTaskStatus(task.id, nextStatus(task.status))}
+                          className="px-2 py-1 rounded bg-elevated border border-line hover:border-blue hover:text-blue transition-colors text-[10px] font-medium text-ink cursor-pointer"
+                          title="Move to next column"
+                        >
+                          Move → {nextStatus(task.status).replace('_', ' ')}
+                        </button>
+
+                        {task.status !== 'done' && (
+                          <button
+                            type="button"
+                            disabled={isBusy}
+                            onClick={() => onDispatchTaskToAgent(task)}
+                            className="px-2 py-1 rounded bg-blue/10 border border-blue/20 hover:bg-blue hover:text-white transition-colors text-[10px] font-semibold text-blue cursor-pointer disabled:opacity-40"
+                            title="Execute task via Antigravity CLI in project directory"
+                          >
+                            Run at Desk 01
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))
                 )}
               </div>
             </div>

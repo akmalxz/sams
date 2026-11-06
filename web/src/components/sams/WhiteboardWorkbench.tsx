@@ -1,30 +1,31 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { Project } from '../../types/sams';
 import { BlackDot } from '../ui/BlackDot';
 
 interface WhiteboardWorkbenchProps {
+  currentProject: Project | null;
   onDispatchPlanTask: (prompt: string) => void;
+  onUpdateFocus: (newFocus: string) => void;
   isBusy: boolean;
 }
 
 export const WhiteboardWorkbench: React.FC<WhiteboardWorkbenchProps> = ({
+  currentProject,
   onDispatchPlanTask,
+  onUpdateFocus,
   isBusy,
 }) => {
-  const [selectedRuleDoc, setSelectedRuleDoc] = useState<string>('AGENTS.md');
-  const [ruleContent, setRuleContent] = useState<string>('');
-  const [loadingRule, setLoadingRule] = useState<boolean>(false);
+  const [focusInput, setFocusInput] = useState(currentProject?.currentFocus || '');
   const [planPrompt, setPlanPrompt] = useState<string>('');
+  const [isSavingFocus, setIsSavingFocus] = useState(false);
 
-  useEffect(() => {
-    setLoadingRule(true);
-    fetch(`/api/vault/note/${selectedRuleDoc}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        setRuleContent(data?.content || 'Rule document not found in vault.');
-      })
-      .catch(() => setRuleContent('Unable to load rule document.'))
-      .finally(() => setLoadingRule(false));
-  }, [selectedRuleDoc]);
+  const handleFocusSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!focusInput.trim()) return;
+    setIsSavingFocus(true);
+    onUpdateFocus(focusInput.trim());
+    setTimeout(() => setIsSavingFocus(false), 500);
+  };
 
   const handlePlanSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,113 +36,125 @@ export const WhiteboardWorkbench: React.FC<WhiteboardWorkbenchProps> = ({
 
   return (
     <div className="space-y-5">
+      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-line">
         <div>
-          <h2 className="text-lg font-serif font-medium text-ink tracking-tight">
-            Whiteboard · Plans & Architecture
-          </h2>
-          <p className="text-xs text-ink-muted">
-            Read-only architectural planning (<code className="font-mono text-ink">--mode=plan</code>) & live workspace rules
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-bold text-ink tracking-tight">
+              Whiteboard · Plans & Architecture
+            </h2>
+            {currentProject && (
+              <span className="text-xs font-mono px-2 py-0.5 rounded bg-blue/10 text-blue font-semibold">
+                {currentProject.name}
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-ink-muted mt-0.5">
+            Project charter, active focus milestone, and Antigravity architectural planning.
           </p>
         </div>
-        <BlackDot state={isBusy ? 'executing' : 'idle'} label="Blueprint Mode" />
+        <BlackDot pulsing={isBusy} label={isBusy ? 'Architect Active' : 'Whiteboard Idle'} />
       </div>
 
-      {/* Live System Topology Diagram Card */}
-      <div className="p-4 rounded-xl bg-surface border border-line space-y-3">
-        <div className="text-xs font-mono font-bold uppercase text-ink">
-          Active Pipeline Topology (8 GB M1 · ExFAT Hardened)
+      {/* 1. What We Are Doing (Active Focus Objective) */}
+      <div className="p-4 rounded-xl bg-surface border border-line shadow-xs space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-blue" />
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-ink">
+              Current Focus ("What We Are Doing")
+            </h3>
+          </div>
+          <span className="text-[11px] font-mono text-ink-muted">
+            Status: <strong className="text-ink">{currentProject?.status.toUpperCase() || 'ON_TRACK'}</strong>
+          </span>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs font-mono">
-          <div className="p-3 rounded-lg bg-canvas border border-line space-y-1">
-            <div className="text-[10px] text-ink-subtle uppercase">1. Intake</div>
-            <div className="font-semibold text-ink">TaskRouter + FTS5</div>
-            <div className="text-[10px] text-ink-muted">BM25 context injection</div>
-          </div>
-          <div className="p-3 rounded-lg bg-canvas border border-line space-y-1">
-            <div className="text-[10px] text-ink-subtle uppercase">2. Desk 01 Mutex</div>
-            <div className="font-semibold text-terracotta">SerialQueue (Max=1)</div>
-            <div className="text-[10px] text-ink-muted">Protects 8 GB RAM</div>
-          </div>
-          <div className="p-3 rounded-lg bg-canvas border border-line space-y-1">
-            <div className="text-[10px] text-ink-subtle uppercase">3. Security Gate</div>
-            <div className="font-semibold text-ochre">StagingGuard</div>
-            <div className="text-[10px] text-ink-muted">staging/ → lsof → mv</div>
-          </div>
-          <div className="p-3 rounded-lg bg-canvas border border-line space-y-1">
-            <div className="text-[10px] text-ink-subtle uppercase">4. Vault Safe</div>
-            <div className="font-semibold text-olive">Akmal SSD /vault</div>
-            <div className="text-[10px] text-ink-muted">Mirrored to Drive</div>
-          </div>
-        </div>
+
+        <form onSubmit={handleFocusSubmit} className="flex gap-2">
+          <input
+            type="text"
+            value={focusInput}
+            onChange={(e) => setFocusInput(e.target.value)}
+            placeholder="e.g. Phase 2: User Authentication & Security Hardening..."
+            className="flex-1 bg-canvas border border-line rounded-lg px-3 py-2 text-xs text-ink placeholder:text-ink-subtle focus:border-blue focus:outline-none"
+          />
+          <button
+            type="submit"
+            disabled={isSavingFocus || !focusInput.trim()}
+            className="px-3 py-2 rounded-lg bg-elevated border border-line text-xs font-medium text-ink hover:border-blue hover:text-blue transition-colors cursor-pointer disabled:opacity-50"
+          >
+            {isSavingFocus ? 'Saved!' : 'Update Focus'}
+          </button>
+        </form>
       </div>
 
-      {/* Quick Read-Only Plan Runner */}
-      <form onSubmit={handlePlanSubmit} className="p-4 rounded-xl bg-surface border border-line space-y-2.5">
-        <label htmlFor="whiteboard-plan-input" className="block text-xs font-mono font-semibold text-ink">
-          Draft Read-Only Architecture Plan (Routes to Architect in `--mode=plan`)
-        </label>
+      {/* 2. Antigravity Brain Session Integration */}
+      {currentProject?.antigravity ? (
+        <div className="p-4 rounded-xl bg-surface border border-line shadow-xs space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-blue">✦</span>
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-ink">
+                Linked Antigravity Session
+              </h3>
+            </div>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-elevated text-ink-muted">
+              {currentProject.antigravity.conversationId?.slice(0, 8)}...
+            </span>
+          </div>
+
+          <div className="rounded-lg bg-canvas p-3 border border-line space-y-2">
+            <div className="text-xs font-medium text-ink">
+              <strong>Active Plan:</strong> {currentProject.antigravity.planTitle || 'Implementation Plan'}
+            </div>
+            {currentProject.antigravity.planArtifactPath && (
+              <p className="text-[11px] font-mono text-ink-muted truncate">
+                Artifact: {currentProject.antigravity.planArtifactPath}
+              </p>
+            )}
+            <div className="flex items-center gap-4 text-xs font-mono text-ink-muted pt-1">
+              <span>Open Checklist Items: <strong className="text-blue">{currentProject.antigravity.openTasksCount || 0}</strong></span>
+              <span>Completed: <strong className="text-emerald-500">{currentProject.antigravity.completedTasksCount || 0}</strong></span>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="p-4 rounded-xl bg-surface border border-line text-xs text-ink-muted flex items-center justify-between">
+          <span>No previous Antigravity session detected for this workspace.</span>
+          <span className="text-blue font-mono font-medium">Auto-scanned</span>
+        </div>
+      )}
+
+      {/* 3. Architect Planning Prompt Box */}
+      <form onSubmit={handlePlanSubmit} className="p-4 rounded-xl bg-surface border border-line shadow-xs space-y-3">
+        <div>
+          <label htmlFor="whiteboard-plan-input" className="block text-xs font-semibold uppercase tracking-wider text-ink mb-1">
+            Draft Architecture Plan with Architect Bot
+          </label>
+          <p className="text-xs text-ink-muted">
+            Runs <code className="font-mono text-blue">agy --mode=plan</code> inside{' '}
+            <code className="font-mono text-ink">{currentProject?.workspacePath || 'this project'}</code> without altering code.
+          </p>
+        </div>
+
         <div className="flex flex-col sm:flex-row gap-2">
           <input
             id="whiteboard-plan-input"
             type="text"
             value={planPrompt}
             onChange={(e) => setPlanPrompt(e.target.value)}
-            placeholder="e.g., Propose a DuckDB schema for tracking monthly personal expenses..."
-            className="flex-1 bg-canvas border border-line rounded px-3 py-2 text-xs font-mono text-ink focus:outline-none focus:border-ink"
+            placeholder="e.g. Design a microservice architecture or state machine..."
+            className="flex-1 bg-canvas border border-line rounded-lg px-3 py-2 text-xs text-ink placeholder:text-ink-subtle focus:border-blue focus:outline-none"
           />
           <button
             type="submit"
             disabled={!planPrompt.trim() || isBusy}
-            className="px-4 py-2 rounded bg-ink text-canvas text-xs font-mono hover:opacity-90 disabled:opacity-40 cursor-pointer shrink-0"
+            className="px-4 py-2 rounded-lg bg-blue text-white text-xs font-semibold hover:opacity-95 transition-opacity cursor-pointer shrink-0 disabled:opacity-50 shadow-sm"
           >
-            Run Plan at Desk 01 →
+            Dispatch to Desk 01 →
           </button>
         </div>
       </form>
-
-      {/* Vault Rules & Persona Definitions Inspector */}
-      <div className="rounded-xl bg-surface border border-line overflow-hidden">
-        <div className="px-4 py-2.5 border-b border-line bg-elevated/60 flex flex-wrap items-center justify-between gap-2">
-          <span className="text-xs font-mono font-semibold text-ink uppercase">
-            Codified Vault Rules & Personas
-          </span>
-          <div className="flex flex-wrap gap-1.5">
-            {[
-              { path: 'AGENTS.md', label: 'AGENTS.md' },
-              { path: '_agents/rules/ui-constraints.md', label: 'ui-constraints.md' },
-              { path: '_agents/rules/vault-schema.md', label: 'vault-schema.md' },
-              { path: '_agents/agents/architect.md', label: 'architect.md' },
-              { path: '_agents/agents/data-engineer.md', label: 'data-engineer.md' },
-            ].map((doc) => (
-              <button
-                key={doc.path}
-                type="button"
-                onClick={() => setSelectedRuleDoc(doc.path)}
-                className={`px-2.5 py-1 rounded text-[11px] font-mono cursor-pointer transition-colors ${
-                  selectedRuleDoc === doc.path
-                    ? 'bg-ink text-canvas font-semibold'
-                    : 'bg-canvas border border-line text-ink-muted hover:text-ink'
-                }`}
-              >
-                {doc.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="p-4">
-          {loadingRule ? (
-            <div className="py-8 flex justify-center">
-              <BlackDot state="executing" label="Loading Vault Rule" />
-            </div>
-          ) : (
-            <pre className="p-3.5 rounded bg-canvas border border-line font-mono text-xs text-ink leading-relaxed whitespace-pre-wrap max-h-[300px] overflow-y-auto">
-              {ruleContent}
-            </pre>
-          )}
-        </div>
-      </div>
     </div>
   );
 };

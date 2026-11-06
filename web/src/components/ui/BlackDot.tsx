@@ -5,6 +5,7 @@ export type BlackDotState = 'idle' | 'synced' | 'queued' | 'executing' | 'stream
 
 interface BlackDotProps {
   state?: BlackDotState;
+  pulsing?: boolean;
   size?: 'sm' | 'md' | 'lg';
   label?: string;
   className?: string;
@@ -12,6 +13,7 @@ interface BlackDotProps {
 
 export const BlackDot: React.FC<BlackDotProps> = ({
   state = 'idle',
+  pulsing = false,
   size = 'md',
   label,
   className,
@@ -23,7 +25,7 @@ export const BlackDot: React.FC<BlackDotProps> = ({
   };
 
   const isQueued = state === 'queued';
-  const isPulsing = state === 'executing' || state === 'streaming';
+  const isPulsing = pulsing || state === 'executing' || state === 'streaming';
 
   return (
     <span className={clsx('inline-flex items-center gap-2 font-mono text-xs text-ink-muted select-none', className)}>

@@ -1,17 +1,21 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   AgentBot,
-  KanbanWorkItem,
   LayoutMode,
   PersonaId,
-  SamsTheme,
   StationId,
   StationMeta,
   VisorState,
+  Project,
+  ProjectTask,
+  ProjectTaskStatus,
+  TaskPriority,
 } from './types/sams';
+import { ProjectCommandHeader } from './components/projects/ProjectCommandHeader';
+import { ProjectPortfolioMatrix } from './components/projects/ProjectPortfolioMatrix';
+import { LinkProjectDialog } from './components/projects/LinkProjectDialog';
 import { IsometricRoom } from './components/sams/IsometricRoom';
 import { AgentStatesDock } from './components/sams/AgentStatesDock';
-import { AgentVisor } from './components/sams/AgentVisor';
 import { KanbanWorkbench } from './components/sams/KanbanWorkbench';
 import { WhiteboardWorkbench } from './components/sams/WhiteboardWorkbench';
 import { SecurityGateWorkbench } from './components/sams/SecurityGateWorkbench';
@@ -32,55 +36,65 @@ interface HealthPayload {
   stagingActiveCount?: number;
 }
 
-const INITIAL_KANBAN: KanbanWorkItem[] = [
-  {
-    id: 'kb_1',
-    title: 'Summarize Vault Welcome Note',
-    prompt: 'Summarize the key architectural points in _Notes/welcome.md in 3 bullet points.',
-    persona: 'archivist',
-    mode: 'plan',
-    column: 'backlog',
-    createdAt: Date.now() - 3600_000,
-  },
-  {
-    id: 'kb_2',
-    title: 'Audit DuckDB Query Metrics',
-    prompt: 'Inspect _Dashboards/overview.md and report the peak task volume and query latency.',
-    persona: 'data-engineer',
-    mode: 'plan',
-    column: 'backlog',
-    createdAt: Date.now() - 1800_000,
-  },
-  {
-    id: 'kb_3',
-    title: 'Initialize ExFAT Vault & Rules',
-    prompt: 'Provision AGENTS.md, ui-constraints.md, and staged-vault-write skill on Akmal SSD.',
-    persona: 'architect',
-    mode: 'auto',
-    column: 'done',
-    createdAt: Date.now() - 7200_000,
-    resultSnippet: 'Provisioned 10 vault files and verified SQLite FTS5 BM25 index.',
-  },
-];
-
 export function App() {
+  // Theme Management (Light: White + SAMS Blue / Dark: Deep Slate)
+  const [themeMode, setThemeMode] = useState<'light' | 'dark'>(() => {
+    try {
+      const saved = localStorage.getItem('sams-theme');
+      if (saved === 'dark' || saved === 'light') return saved;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    } catch {
+      return 'light';
+    }
+  });
+
+  const toggleTheme = () => {
+    const next = themeMode === 'dark' ? 'light' : 'dark';
+    setThemeMode(next);
+    document.documentElement.setAttribute('data-theme', next);
+    const meta = document.querySelector('meta[name="color-scheme"]');
+    if (meta) meta.setAttribute('content', next);
+    localStorage.setItem('sams-theme', next);
+  };
+
+  // Multi-Project State
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
+
+  // Layout & Navigation State
   const [activeStation, setActiveStation] = useState<StationId>('desk01');
   const [vaultSubTab, setVaultSubTab] = useState<'analytics' | 'notes'>('analytics');
   const [layoutMode, setLayoutMode] = useState<LayoutMode>('split');
-  const [theme, setTheme] = useState<SamsTheme>('earth');
 
+  // Agent Bot & Visor Telemetry
   const [selectedPersona, setSelectedPersona] = useState<PersonaId>('architect');
   const [activeDeskPersona, setActiveDeskPersona] = useState<'architect' | 'data-engineer' | 'archivist'>('architect');
   const [liveVisorState, setLiveVisorState] = useState<VisorState>('idle');
   const [overrideVisorState, setOverrideVisorState] = useState<VisorState | null>(null);
 
+  // System & Vault Health
   const [health, setHealth] = useState<HealthPayload | null>(null);
   const [healthOffline, setHealthOffline] = useState<boolean>(false);
   const [notesCount, setNotesCount] = useState<number>(10);
 
-  const [kanbanItems, setKanbanItems] = useState<KanbanWorkItem[]>(INITIAL_KANBAN);
+  // Job Execution Trigger
   const [externalJobTrigger, setExternalJobTrigger] = useState<ExternalJobTrigger | null>(null);
 
+  // Fetch Projects from Backend
+  const fetchProjects = async () => {
+    try {
+      const res = await fetch('/api/projects');
+      if (res.ok) {
+        const data = await res.json();
+        setProjects(data.projects || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch projects:', err);
+    }
+  };
+
+  // Fetch System Telemetry
   const fetchSystemTelemetry = async () => {
     try {
       const [healthRes, notesRes] = await Promise.all([
@@ -104,12 +118,16 @@ export function App() {
   };
 
   useEffect(() => {
+    fetchProjects();
     fetchSystemTelemetry();
-    const timer = setInterval(fetchSystemTelemetry, 4000);
+    const timer = setInterval(() => {
+      fetchProjects();
+      fetchSystemTelemetry();
+    }, 4500);
     return () => clearInterval(timer);
   }, []);
 
-  // Reset `success` visor back to `idle` after 4.5s celebration
+  // Reset `success` visor back to `idle` after celebration
   useEffect(() => {
     if (liveVisorState === 'success') {
       const t = setTimeout(() => {
@@ -118,6 +136,9 @@ export function App() {
       return () => clearTimeout(t);
     }
   }, [liveVisorState]);
+
+  const currentProject = projects.find((p) => p.id === selectedProjectId) || null;
+  const currentTasks = currentProject?.tasks || [];
 
   const isDeskBusy =
     liveVisorState === 'researching' ||
@@ -130,15 +151,15 @@ export function App() {
       ? 'error'
       : liveVisorState;
 
-  // Compute honest spatial coordinates for the 4 Bots based on live system state
+  // Spatial coordinates for the 4 Bots
   const bots: AgentBot[] = [
     {
       id: 'architect',
       name: 'Architect',
       role: 'UI & System Blueprint (Pro)',
       modelTier: 'pro',
-      bodyColor: theme === 'blueprint' ? '#2563EB' : '#B85D3B',
-      accentColor: '#FAF8F4',
+      bodyColor: '#2563EB',
+      accentColor: '#FFFFFF',
       station:
         isDeskBusy && activeDeskPersona === 'architect'
           ? 'desk01'
@@ -173,8 +194,8 @@ export function App() {
       name: 'Data Engineer',
       role: 'DuckDB & Python ETL (Pro)',
       modelTier: 'pro',
-      bodyColor: theme === 'blueprint' ? '#0D9488' : '#5F6F52',
-      accentColor: '#FAF8F4',
+      bodyColor: '#0D9488',
+      accentColor: '#FFFFFF',
       station:
         isDeskBusy && activeDeskPersona === 'data-engineer'
           ? 'desk01'
@@ -189,7 +210,7 @@ export function App() {
             : 'idle',
       statusText:
         isDeskBusy && activeDeskPersona === 'data-engineer'
-          ? 'Running DuckDB at Desk 01'
+          ? 'Running ETL at Desk 01'
           : 'Idle in Lounge Chair',
       x:
         isDeskBusy && activeDeskPersona === 'data-engineer'
@@ -209,8 +230,8 @@ export function App() {
       name: 'Archivist',
       role: 'Vault Curator & FTS5 (Flash)',
       modelTier: 'flash',
-      bodyColor: theme === 'blueprint' ? '#7C3AED' : '#C28F42',
-      accentColor: '#FAF8F4',
+      bodyColor: '#7C3AED',
+      accentColor: '#FFFFFF',
       station:
         isDeskBusy && activeDeskPersona === 'archivist'
           ? 'desk01'
@@ -225,7 +246,7 @@ export function App() {
             : 'idle',
       statusText:
         isDeskBusy && activeDeskPersona === 'archivist'
-          ? 'Curating notes at Desk 01'
+          ? 'Curating at Desk 01'
           : 'Tending Kanban Wall',
       x:
         isDeskBusy && activeDeskPersona === 'archivist'
@@ -243,10 +264,10 @@ export function App() {
     {
       id: 'sentinel',
       name: 'Sync Sentinel',
-      role: 'StagingGuard & Drive Lock Gate',
+      role: 'StagingGuard & Git Release Gate',
       modelTier: 'guard',
-      bodyColor: '#5C6468',
-      accentColor: '#FAF8F4',
+      bodyColor: '#475569',
+      accentColor: '#FFFFFF',
       station: 'security',
       visorState:
         computedGlobalState === 'offline'
@@ -256,44 +277,44 @@ export function App() {
             : (health?.stagingActiveCount ?? 0) > 0
               ? 'active'
               : 'idle',
-      statusText: 'Guarding Security Turnstile',
+      statusText: 'Guarding Release Turnstile',
       x: 76,
       y: 65,
     },
   ];
 
   const kanbanCounts = {
-    backlog: kanbanItems.filter((i) => i.column === 'backlog').length,
-    in_progress: kanbanItems.filter((i) => i.column === 'in_progress').length,
-    review: kanbanItems.filter((i) => i.column === 'review').length,
-    done: kanbanItems.filter((i) => i.column === 'done').length,
+    backlog: currentTasks.filter((i) => i.status === 'backlog').length,
+    in_progress: currentTasks.filter((i) => i.status === 'in_progress').length,
+    review: currentTasks.filter((i) => i.status === 'review').length,
+    done: currentTasks.filter((i) => i.status === 'done').length,
   };
 
   const stations: Record<StationId, StationMeta> = {
     vault: {
       id: 'vault',
-      title: 'Vault',
-      subtitle: `Secure Storage · ${notesCount} Notes`,
+      title: 'Vault Safe',
+      subtitle: `Knowledge Base · ${notesCount} Notes`,
       badgeText: `${notesCount} Notes`,
       isBusy: liveVisorState === 'success',
     },
     whiteboard: {
       id: 'whiteboard',
       title: 'Whiteboard',
-      subtitle: 'Plans & Architecture',
-      badgeText: 'AGENTS.md',
+      subtitle: 'Plans & Charter',
+      badgeText: currentProject?.status || 'Charter',
     },
     kanban: {
       id: 'kanban',
       title: 'Kanban Wall',
-      subtitle: `Work Items · ${kanbanCounts.backlog} Backlog`,
-      badgeText: `${kanbanItems.length} Cards`,
+      subtitle: `Deliverables · ${kanbanCounts.backlog} Backlog`,
+      badgeText: `${currentTasks.length} Cards`,
       isBusy: kanbanCounts.in_progress > 0,
     },
     desk01: {
       id: 'desk01',
       title: 'Desk 01',
-      subtitle: isDeskBusy ? `Active: ${activeDeskPersona}` : 'Active: Compute (Idle)',
+      subtitle: isDeskBusy ? `Active: ${activeDeskPersona}` : 'Compute (Idle)',
       badgeText: isDeskBusy ? 'BUSY' : 'READY',
       isBusy: isDeskBusy,
     },
@@ -301,11 +322,11 @@ export function App() {
       id: 'security',
       title: 'Security Gate',
       subtitle:
-        (health?.driveConflictsCount ?? 0) > 0
-          ? `${health?.driveConflictsCount} Sync Conflicts`
-          : 'Access Control · Clean',
-      badgeText: 'Gate OK',
-      hasAlert: (health?.driveConflictsCount ?? 0) > 0 || !health?.ssdMounted,
+        (currentProject?.git?.uncommittedChanges ?? 0) > 0
+          ? `${currentProject?.git?.uncommittedChanges} Uncommitted`
+          : 'Git & Release · Clean',
+      badgeText: (currentProject?.git?.uncommittedChanges ?? 0) > 0 ? 'DIRTY' : 'CLEAN',
+      hasAlert: (currentProject?.git?.uncommittedChanges ?? 0) > 0 || (health?.driveConflictsCount ?? 0) > 0,
     },
   };
 
@@ -323,52 +344,92 @@ export function App() {
     }
   };
 
-  const handleAddKanbanItem = (
-    title: string,
-    prompt: string,
-    persona: 'architect' | 'data-engineer' | 'archivist',
-    mode: 'auto' | 'plan'
-  ) => {
-    const newItem: KanbanWorkItem = {
-      id: `kb_${Date.now()}`,
-      title,
-      prompt,
-      persona,
-      mode,
-      column: 'backlog',
-      createdAt: Date.now(),
-    };
-    setKanbanItems((prev) => [newItem, ...prev]);
+  // --- Task Handlers ---
+  const handleAddTask = async (title: string, priority: TaskPriority, assignedAgent?: PersonaId) => {
+    if (!currentProject) return;
+    try {
+      await fetch(`/api/projects/${currentProject.id}/tasks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          priority,
+          assignedAgent,
+          status: 'backlog',
+        }),
+      });
+      fetchProjects();
+    } catch (err) {
+      console.error('Failed to add task:', err);
+    }
   };
 
-  const handleDispatchKanbanItem = async (item: KanbanWorkItem) => {
-    // Move card to in_progress & switch focus to Desk 01
-    setKanbanItems((prev) =>
-      prev.map((c) => (c.id === item.id ? { ...c, column: 'in_progress' } : c))
-    );
-    setSelectedPersona(item.persona);
-    setActiveDeskPersona(item.persona);
+  const handleUpdateTaskStatus = async (taskId: string, status: ProjectTaskStatus) => {
+    if (!currentProject) return;
+    try {
+      await fetch(`/api/projects/${currentProject.id}/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      fetchProjects();
+    } catch (err) {
+      console.error('Failed to update task status:', err);
+    }
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    if (!currentProject) return;
+    try {
+      await fetch(`/api/projects/${currentProject.id}/tasks/${taskId}`, {
+        method: 'DELETE',
+      });
+      fetchProjects();
+    } catch (err) {
+      console.error('Failed to delete task:', err);
+    }
+  };
+
+  const handleToggleTask = (projectId: string, task: ProjectTask) => {
+    const nextStatus = task.status === 'done' ? 'backlog' : 'done';
+    fetch(`/api/projects/${projectId}/tasks/${task.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: nextStatus }),
+    }).then(() => fetchProjects());
+  };
+
+  const handleDispatchTaskToAgent = async (task: ProjectTask) => {
+    if (!currentProject) return;
     setActiveStation('desk01');
+    setSelectedPersona((task.assignedAgent as any) || 'architect');
+    setActiveDeskPersona((task.assignedAgent as any) || 'architect');
     setLiveVisorState('researching');
+
+    const prompt = `Work on project deliverable: ${task.title}. ${task.description || ''}`;
 
     try {
       const res = await fetch('/api/agent/task', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: item.prompt,
-          persona: item.persona,
-          mode: item.mode,
+          prompt,
+          persona: task.assignedAgent || 'architect',
+          mode: 'auto',
+          projectId: currentProject.id,
+          targetDir: currentProject.workspacePath,
         }),
       });
       if (res.ok) {
         const data = await res.json();
         setExternalJobTrigger({
           jobId: data.jobId,
-          prompt: item.prompt,
-          persona: item.persona,
-          mode: item.mode,
+          prompt,
+          persona: (task.assignedAgent as any) || 'architect',
+          mode: 'auto',
         });
+        // Move task to in_progress
+        handleUpdateTaskStatus(task.id, 'in_progress');
       }
     } catch {
       setLiveVisorState('error');
@@ -376,9 +437,9 @@ export function App() {
   };
 
   const handleDispatchWhiteboardPlan = async (planPrompt: string) => {
+    setActiveStation('desk01');
     setSelectedPersona('architect');
     setActiveDeskPersona('architect');
-    setActiveStation('desk01');
     setLiveVisorState('researching');
 
     try {
@@ -389,6 +450,8 @@ export function App() {
           prompt: planPrompt,
           persona: 'architect',
           mode: 'plan',
+          projectId: currentProject?.id,
+          targetDir: currentProject?.workspacePath,
         }),
       });
       if (res.ok) {
@@ -405,312 +468,280 @@ export function App() {
     }
   };
 
+  const handleUpdateProjectFocus = async (newFocus: string) => {
+    if (!currentProject) return;
+    try {
+      await fetch(`/api/projects/${currentProject.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentFocus: newFocus }),
+      });
+      fetchProjects();
+    } catch (err) {
+      console.error('Failed to update focus:', err);
+    }
+  };
+
   const handleVisorStateChange = (
     nextState: VisorState,
     persona: 'architect' | 'data-engineer' | 'archivist',
-    resultSnippet?: string
   ) => {
     setActiveDeskPersona(persona);
     setLiveVisorState(nextState);
 
     if (nextState === 'success') {
-      // Advance any in_progress Kanban item to review/done
-      setKanbanItems((prev) =>
-        prev.map((item) =>
-          item.column === 'in_progress'
-            ? {
-                ...item,
-                column: 'review',
-                resultSnippet: resultSnippet || 'Task completed via Desk 01.',
-              }
-            : item
-        )
-      );
+      fetchProjects();
       fetchSystemTelemetry();
     }
   };
 
-  const handleMoveItemColumn = (id: string, col: KanbanWorkItem['column']) => {
-    setKanbanItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, column: col } : item))
-    );
-  };
-
   return (
-    <div className="min-h-screen flex flex-col bg-canvas text-ink font-sans selection:bg-surface selection:text-ink">
-      {/* Skip Link for Keyboard Accessibility */}
-      <a
-        href="#sams-main-workspace"
-        className="visually-hidden focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:px-4 focus:py-2 focus:bg-ink focus:text-canvas focus:rounded-lg focus:font-mono focus:text-xs"
-      >
-        Skip to main SAMS workspace
-      </a>
+    <div className="min-h-screen flex flex-col bg-canvas text-ink font-sans selection:bg-blue selection:text-white transition-colors duration-200">
+      {/* 1. Top Multi-Project Command Bar */}
+      <ProjectCommandHeader
+        projects={projects}
+        selectedProjectId={selectedProjectId}
+        onSelectProject={(id) => {
+          setSelectedProjectId(id);
+        }}
+        onOpenLinkDialog={() => setIsLinkDialogOpen(true)}
+        layoutMode={layoutMode}
+        onChangeLayout={setLayoutMode}
+        theme={themeMode}
+        onToggleTheme={toggleTheme}
+        ssdMounted={health?.ssdMounted ?? false}
+        freeSpaceGB={health?.freeSpaceGB ?? 0}
+      />
 
-      {/* 1. Top SAMS Brand & Telemetry Header */}
-      <header className="border-b border-line bg-surface/85 backdrop-blur-xs px-5 py-3">
-        <div className="max-w-[1440px] mx-auto flex flex-wrap items-center justify-between gap-4">
-          {/* Left: Brand Identity */}
-          <div className="flex items-center gap-3.5">
-            <AgentVisor
-              state={overrideVisorState || computedGlobalState}
-              size="sm"
-              frameColor={theme === 'blueprint' ? '#2563EB' : '#B85D3B'}
-              decorative={false}
-              label={`SAMS System Status: ${overrideVisorState || computedGlobalState}`}
-            />
-            <div>
-              <div className="flex items-center gap-2.5">
-                <h1
-                  id="sams-main-workspace"
-                  tabIndex={-1}
-                  className="text-lg font-sans font-bold tracking-tight text-ink focus:outline-none"
-                >
-                  SAMS <span className="font-normal text-ink-muted">· Spatial Agentic Management System</span>
-                </h1>
+      {/* 2. Main Viewport: Either All Projects Portfolio OR Project-Scoped Split Stage */}
+      {selectedProjectId === null ? (
+        /* ================= ALL PROJECTS PORTFOLIO VIEW ================= */
+        <main className="flex-1 overflow-y-auto">
+          <ProjectPortfolioMatrix
+            projects={projects}
+            onSelectProject={(id) => setSelectedProjectId(id)}
+            onOpenLinkDialog={() => setIsLinkDialogOpen(true)}
+            onRefreshProjects={fetchProjects}
+            onToggleTask={handleToggleTask}
+          />
+        </main>
+      ) : (
+        /* ================= SCOPED PROJECT COMMAND STUDIO ================= */
+        <div className="flex-1 flex flex-col">
+          {/* Station Quick-Jump Subheader for Scoped Project */}
+          <nav
+            aria-label="Workspace Stations"
+            className="border-b border-line bg-surface/70 backdrop-blur-xs px-5 py-1"
+          >
+            <div className="max-w-[1440px] mx-auto flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-1">
+                {(
+                  [
+                    { id: 'desk01', label: 'Desk 01 (Compute)' },
+                    { id: 'kanban', label: `Kanban (${currentTasks.length} Deliverables)` },
+                    { id: 'whiteboard', label: 'Whiteboard (Plans & Focus)' },
+                    { id: 'security', label: 'Security Gate (Git & Health)' },
+                    { id: 'vault', label: 'Vault (Knowledge & Charts)' },
+                  ] as Array<{ id: StationId; label: string }>
+                ).map((st) => {
+                  const isSelected = activeStation === st.id;
+                  return (
+                    <button
+                      key={st.id}
+                      type="button"
+                      aria-pressed={isSelected}
+                      onClick={() => setActiveStation(st.id)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                        isSelected
+                          ? 'bg-blue text-white shadow-xs font-semibold'
+                          : 'text-ink-muted hover:text-ink hover:bg-elevated'
+                      }`}
+                    >
+                      {st.label}
+                    </button>
+                  );
+                })}
               </div>
-              <p className="text-xs font-mono text-ink-muted">
-                Headless Obsidian Vault on <span className="text-ink font-semibold">/Volumes/Akmal SSD</span> ({health?.freeSpaceGB ?? 202.8} GB free) · RAM: <span className="text-ink">{health?.memoryUsageMB ?? 24} MB</span>
-              </p>
-            </div>
-          </div>
 
-          {/* Right: Layout Mode & Theme Controls */}
-          <div className="flex flex-wrap items-center gap-2.5 text-xs font-mono">
-            {/* Layout Switcher */}
-            <div
-              role="group"
-              aria-label="Workspace Layout Mode"
-              className="flex rounded-lg border border-line bg-canvas overflow-hidden"
-            >
-              {(
-                [
-                  { id: 'split', label: 'Split Workbench' },
-                  { id: 'stage', label: 'Full Room' },
-                  { id: 'workbench', label: 'Full Panel' },
-                ] as Array<{ id: LayoutMode; label: string }>
-              ).map((m) => (
+              {/* Scoped Project Name Pill */}
+              <div className="flex items-center gap-2 text-xs font-mono">
+                <span className="text-ink-muted">Scoped to:</span>
+                <span className="font-bold text-ink bg-elevated px-2.5 py-1 rounded border border-line">
+                  {currentProject?.name}
+                </span>
                 <button
-                  key={m.id}
                   type="button"
-                  aria-pressed={layoutMode === m.id}
-                  onClick={() => setLayoutMode(m.id)}
-                  className={`px-3 py-1.5 cursor-pointer transition-colors ${
-                    layoutMode === m.id
-                      ? 'bg-ink text-canvas font-semibold'
-                      : 'text-ink-muted hover:text-ink hover:bg-elevated'
-                  }`}
+                  onClick={() => setSelectedProjectId(null)}
+                  className="text-blue hover:underline cursor-pointer"
                 >
-                  {m.label}
+                  ← Portfolio
                 </button>
-              ))}
+              </div>
             </div>
+          </nav>
 
-            {/* Theme Toggle */}
-            <button
-              type="button"
-              onClick={() => setTheme(theme === 'earth' ? 'blueprint' : 'earth')}
-              className="px-3 py-1.5 rounded-lg border border-line bg-canvas text-ink hover:bg-elevated cursor-pointer transition-colors"
-            >
-              Palette: {theme === 'earth' ? 'Earth Studio' : 'SAMS Blueprint'}
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* 2. Station Quick-Jump Navigation Bar */}
-      <nav
-        aria-label="Workspace Stations"
-        className="border-b border-line bg-canvas/90 px-5"
-      >
-        <div className="max-w-[1440px] mx-auto flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-1">
-            {(
-              [
-                { id: 'desk01', label: 'Desk 01 (Compute)' },
-                { id: 'vault', label: 'Vault (Storage & Charts)' },
-                { id: 'kanban', label: 'Kanban Wall (Tasks)' },
-                { id: 'whiteboard', label: 'Whiteboard (Plans)' },
-                { id: 'security', label: 'Security Gate (Sync Guard)' },
-              ] as Array<{ id: StationId; label: string }>
-            ).map((st) => {
-              const isSelected = activeStation === st.id;
-              return (
-                <button
-                  key={st.id}
-                  type="button"
-                  aria-pressed={isSelected}
-                  onClick={() => setActiveStation(st.id)}
-                  className={`px-3.5 py-2.5 text-xs font-mono border-b-2 transition-colors cursor-pointer ${
-                    isSelected
-                      ? 'border-ink text-ink font-semibold'
-                      : 'border-transparent text-ink-muted hover:text-ink hover:border-line'
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                    {isSelected && <BlackDot size="sm" />}
-                    <span>{st.label}</span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="hidden lg:flex items-center gap-2 text-[11px] font-mono text-ink-subtle">
-            <BlackDot state={isDeskBusy ? 'executing' : 'idle'} size="sm" />
-            <span>
-              {isDeskBusy
-                ? `${activeDeskPersona.toUpperCase()} active at Desk 01`
-                : 'Desk 01 available (0 queued)'}
-            </span>
-          </div>
-        </div>
-      </nav>
-
-      {/* 3. Main Split-Stage Workspace */}
-      <main className="flex-1 max-w-[1440px] w-full mx-auto px-5 py-5">
-        <div
-          className={
-            layoutMode === 'split'
-              ? 'grid grid-cols-1 lg:grid-cols-12 gap-6 items-start'
-              : 'space-y-6'
-          }
-        >
-          {/* LEFT PANE: Isometric Room Stage + 6-State Agent Visor Dock */}
-          {(layoutMode === 'split' || layoutMode === 'stage') && (
+          {/* Split-Stage Workspace */}
+          <main className="flex-1 max-w-[1440px] w-full mx-auto px-5 py-5">
             <div
               className={
                 layoutMode === 'split'
-                  ? 'lg:col-span-6 space-y-4 lg:sticky lg:top-5'
-                  : 'max-w-5xl mx-auto space-y-5'
+                  ? 'grid grid-cols-1 lg:grid-cols-12 gap-6 items-start'
+                  : 'space-y-6'
               }
             >
-              <IsometricRoom
-                activeStation={activeStation}
-                onSelectStation={(st) => {
-                  setActiveStation(st);
-                  if (layoutMode === 'stage') {
-                    setLayoutMode('split');
+              {/* LEFT PANE: Isometric Room Stage + 6-State Agent Visor Dock */}
+              {(layoutMode === 'split' || layoutMode === 'stage') && (
+                <div
+                  className={
+                    layoutMode === 'split'
+                      ? 'lg:col-span-6 space-y-4 lg:sticky lg:top-16'
+                      : 'max-w-5xl mx-auto space-y-5'
                   }
-                }}
-                bots={bots}
-                onSelectBot={handleSelectBot}
-                stations={stations}
-                kanbanCounts={kanbanCounts}
-                isDeskBusy={isDeskBusy}
-                overrideVisorState={overrideVisorState}
-                theme={theme}
-              />
+                >
+                  <IsometricRoom
+                    activeStation={activeStation}
+                    onSelectStation={(st) => {
+                      setActiveStation(st);
+                      if (layoutMode === 'stage') {
+                        setLayoutMode('split');
+                      }
+                    }}
+                    bots={bots}
+                    onSelectBot={handleSelectBot}
+                    stations={stations}
+                    kanbanCounts={kanbanCounts}
+                    isDeskBusy={isDeskBusy}
+                    overrideVisorState={overrideVisorState}
+                    isDark={themeMode === 'dark'}
+                  />
 
-              <AgentStatesDock
-                currentGlobalState={computedGlobalState}
-                overrideState={overrideVisorState}
-                onSelectOverrideState={setOverrideVisorState}
-                bots={bots}
-                selectedPersona={selectedPersona}
-                onSelectBot={handleSelectBot}
-                onSelectStation={setActiveStation}
-                theme={theme}
-              />
-            </div>
-          )}
-
-          {/* RIGHT PANE: Active Station Workbench */}
-          {(layoutMode === 'split' || layoutMode === 'workbench') && (
-            <aside
-              aria-label="Active Station Workbench"
-              className={
-                layoutMode === 'split'
-                  ? 'lg:col-span-6 rounded-2xl bg-elevated/70 border border-line p-5 shadow-xs'
-                  : 'max-w-6xl mx-auto rounded-2xl bg-elevated/70 border border-line p-6 shadow-xs'
-              }
-            >
-              {activeStation === 'desk01' && (
-                <AgentConsole
-                  selectedPersona={activeDeskPersona}
-                  onSelectPersona={(p) => {
-                    setActiveDeskPersona(p);
-                    setSelectedPersona(p);
-                  }}
-                  externalTrigger={externalJobTrigger}
-                  onVisorStateChange={handleVisorStateChange}
-                />
-              )}
-
-              {activeStation === 'vault' && (
-                <div className="space-y-5">
-                  {/* Sub-Navigation inside Vault Safe: Analytics vs Knowledge Graph */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-line">
-                    <div className="flex items-center gap-2">
-                      <BlackDot state="synced" size="sm" />
-                      <span className="text-xs font-mono font-bold uppercase text-ink">
-                        Vault Safe Inspector (/Volumes/Akmal SSD/PersonalAI/vault)
-                      </span>
-                    </div>
-                    <div className="flex rounded-lg border border-line bg-canvas overflow-hidden text-xs font-mono">
-                      <button
-                        type="button"
-                        aria-pressed={vaultSubTab === 'analytics'}
-                        onClick={() => setVaultSubTab('analytics')}
-                        className={`px-3 py-1 cursor-pointer ${
-                          vaultSubTab === 'analytics'
-                            ? 'bg-ink text-canvas font-semibold'
-                            : 'text-ink-muted hover:text-ink'
-                        }`}
-                      >
-                        Recharts & KPIs
-                      </button>
-                      <button
-                        type="button"
-                        aria-pressed={vaultSubTab === 'notes'}
-                        onClick={() => setVaultSubTab('notes')}
-                        className={`px-3 py-1 cursor-pointer ${
-                          vaultSubTab === 'notes'
-                            ? 'bg-ink text-canvas font-semibold'
-                            : 'text-ink-muted hover:text-ink'
-                        }`}
-                      >
-                        FTS5 Note Graph ({notesCount})
-                      </button>
-                    </div>
-                  </div>
-
-                  {vaultSubTab === 'analytics' ? <DashboardGrid /> : <NoteExplorer />}
+                  <AgentStatesDock
+                    currentGlobalState={computedGlobalState}
+                    overrideState={overrideVisorState}
+                    onSelectOverrideState={setOverrideVisorState}
+                    bots={bots}
+                    selectedPersona={selectedPersona}
+                    onSelectBot={handleSelectBot}
+                    onSelectStation={setActiveStation}
+                  />
                 </div>
               )}
 
-              {activeStation === 'kanban' && (
-                <KanbanWorkbench
-                  items={kanbanItems}
-                  onAddItem={handleAddKanbanItem}
-                  onDispatchItem={handleDispatchKanbanItem}
-                  onMoveItemColumn={handleMoveItemColumn}
-                  isBusy={isDeskBusy}
-                />
-              )}
+              {/* RIGHT PANE: Active Station Workbench */}
+              {(layoutMode === 'split' || layoutMode === 'workbench') && (
+                <aside
+                  aria-label="Active Station Workbench"
+                  className={
+                    layoutMode === 'split'
+                      ? 'lg:col-span-6 rounded-2xl bg-surface border border-line p-5 shadow-xs'
+                      : 'max-w-6xl mx-auto rounded-2xl bg-surface border border-line p-6 shadow-xs'
+                  }
+                >
+                  {activeStation === 'desk01' && (
+                    <AgentConsole
+                      currentProject={currentProject}
+                      selectedPersona={activeDeskPersona}
+                      onSelectPersona={(p) => {
+                        setActiveDeskPersona(p);
+                        setSelectedPersona(p);
+                      }}
+                      externalTrigger={externalJobTrigger}
+                      onVisorStateChange={handleVisorStateChange}
+                    />
+                  )}
 
-              {activeStation === 'whiteboard' && (
-                <WhiteboardWorkbench
-                  onDispatchPlanTask={handleDispatchWhiteboardPlan}
-                  isBusy={isDeskBusy}
-                />
-              )}
+                  {activeStation === 'kanban' && (
+                    <KanbanWorkbench
+                      currentProject={currentProject}
+                      tasks={currentTasks}
+                      onAddTask={handleAddTask}
+                      onUpdateTaskStatus={handleUpdateTaskStatus}
+                      onDeleteTask={handleDeleteTask}
+                      onDispatchTaskToAgent={handleDispatchTaskToAgent}
+                      isBusy={isDeskBusy}
+                    />
+                  )}
 
-              {activeStation === 'security' && (
-                <SecurityGateWorkbench
-                  health={health}
-                  onRefreshHealth={fetchSystemTelemetry}
-                />
+                  {activeStation === 'whiteboard' && (
+                    <WhiteboardWorkbench
+                      currentProject={currentProject}
+                      onDispatchPlanTask={handleDispatchWhiteboardPlan}
+                      onUpdateFocus={handleUpdateProjectFocus}
+                      isBusy={isDeskBusy}
+                    />
+                  )}
+
+                  {activeStation === 'security' && (
+                    <SecurityGateWorkbench
+                      currentProject={currentProject}
+                      health={health}
+                      onRefreshHealth={fetchSystemTelemetry}
+                      onRefreshProject={fetchProjects}
+                    />
+                  )}
+
+                  {activeStation === 'vault' && (
+                    <div className="space-y-5">
+                      <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-line">
+                        <div className="flex items-center gap-2">
+                          <BlackDot pulsing={false} />
+                          <span className="text-xs font-mono font-bold uppercase text-ink">
+                            Vault Safe Inspector (/Volumes/Akmal SSD/PersonalAI/vault)
+                          </span>
+                        </div>
+                        <div className="flex rounded-lg border border-line bg-canvas overflow-hidden text-xs font-mono">
+                          <button
+                            type="button"
+                            aria-pressed={vaultSubTab === 'analytics'}
+                            onClick={() => setVaultSubTab('analytics')}
+                            className={`px-3 py-1 cursor-pointer ${
+                              vaultSubTab === 'analytics'
+                                ? 'bg-blue text-white font-semibold'
+                                : 'text-ink-muted hover:text-ink'
+                            }`}
+                          >
+                            Recharts & KPIs
+                          </button>
+                          <button
+                            type="button"
+                            aria-pressed={vaultSubTab === 'notes'}
+                            onClick={() => setVaultSubTab('notes')}
+                            className={`px-3 py-1 cursor-pointer ${
+                              vaultSubTab === 'notes'
+                                ? 'bg-blue text-white font-semibold'
+                                : 'text-ink-muted hover:text-ink'
+                            }`}
+                          >
+                            FTS5 Note Graph ({notesCount})
+                          </button>
+                        </div>
+                      </div>
+
+                      {vaultSubTab === 'analytics' ? <DashboardGrid /> : <NoteExplorer />}
+                    </div>
+                  )}
+                </aside>
               )}
-            </aside>
-          )}
+            </div>
+          </main>
         </div>
-      </main>
+      )}
+
+      {/* 3. Link Project Native Dialog */}
+      <LinkProjectDialog
+        isOpen={isLinkDialogOpen}
+        onClose={() => setIsLinkDialogOpen(false)}
+        onProjectLinked={(newProj) => {
+          fetchProjects();
+          setSelectedProjectId(newProj.id);
+        }}
+      />
 
       {/* 4. Footer */}
-      <footer className="border-t border-line py-3.5 bg-surface/50 text-xs font-mono text-ink-subtle">
+      <footer className="border-t border-line py-3 bg-surface/50 text-[11px] font-mono text-ink-muted">
         <div className="max-w-[1440px] mx-auto px-5 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>SAMS Split-Stage Workbench · 2.5D Isometric SVG (&lt;15 MB RAM)</span>
-          <span>Headless Vault: /Volumes/Akmal SSD/PersonalAI/vault · Google Antigravity CLI</span>
+          <span>SAMS Multi-Project Command Centre · White + Blue Light / Deep Slate Dark Theme</span>
+          <span>Storage: /Volumes/Akmal SSD/PersonalAI/vault · Antigravity Orchestration</span>
         </div>
       </footer>
     </div>

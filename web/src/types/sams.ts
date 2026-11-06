@@ -44,3 +44,66 @@ export interface StationMeta {
   isBusy?: boolean;
   hasAlert?: boolean;
 }
+
+export type ProjectStatus = 'on_track' | 'at_risk' | 'blocked' | 'completed';
+export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
+export type ProjectTaskStatus = 'backlog' | 'in_progress' | 'review' | 'done';
+
+export interface ProjectTask {
+  id: string;
+  projectId: string;
+  title: string;
+  description?: string;
+  status: ProjectTaskStatus;
+  priority: TaskPriority;
+  assignedAgent?: PersonaId;
+  source?: 'manual' | 'antigravity_plan' | 'git';
+  createdAt: number;
+  updatedAt: number;
+  completedAt?: number;
+}
+
+export interface ProjectGitStatus {
+  isGitRepo: boolean;
+  branch?: string;
+  uncommittedChanges?: number;
+  lastCommitHash?: string;
+  lastCommitMessage?: string;
+  lastCommitDate?: string;
+  remoteUrl?: string;
+}
+
+export interface AntigravitySessionSummary {
+  conversationId?: string;
+  lastUpdated?: number;
+  recentGoal?: string;
+  planArtifactPath?: string;
+  planTitle?: string;
+  openTasksCount?: number;
+  completedTasksCount?: number;
+  openTasks?: string[];
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  workspacePath: string;
+  description?: string;
+  status: ProjectStatus;
+  currentFocus?: string;
+  progressPercent: number;
+  color?: string;
+  git?: ProjectGitStatus;
+  antigravity?: AntigravitySessionSummary;
+  tasks?: ProjectTask[];
+  taskCounts?: {
+    total: number;
+    backlog: number;
+    in_progress: number;
+    review: number;
+    done: number;
+  };
+  createdAt: number;
+  updatedAt: number;
+}
+

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { BlackDot } from '../ui/BlackDot';
-import { VisorState } from '../../types/sams';
+import { VisorState, Project } from '../../types/sams';
 
 interface StreamEvent {
   type: string;
@@ -16,6 +16,7 @@ export interface ExternalJobTrigger {
 }
 
 interface AgentConsoleProps {
+  currentProject?: Project | null;
   selectedPersona?: 'architect' | 'data-engineer' | 'archivist';
   onSelectPersona?: (p: 'architect' | 'data-engineer' | 'archivist') => void;
   externalTrigger?: ExternalJobTrigger | null;
@@ -27,6 +28,7 @@ interface AgentConsoleProps {
 }
 
 export const AgentConsole: React.FC<AgentConsoleProps> = ({
+  currentProject,
   selectedPersona = 'architect',
   onSelectPersona,
   externalTrigger,
@@ -95,6 +97,8 @@ export const AgentConsole: React.FC<AgentConsoleProps> = ({
           prompt: prompt.trim(),
           persona,
           mode,
+          projectId: currentProject?.id,
+          targetDir: currentProject?.workspacePath,
         }),
       });
 
@@ -221,6 +225,16 @@ export const AgentConsole: React.FC<AgentConsoleProps> = ({
           label={jobStatus.toUpperCase()}
         />
       </div>
+
+      {currentProject && (
+        <div className="text-[11px] font-mono text-ink-muted bg-surface px-3 py-2 rounded-xl border border-line flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-blue" />
+            <span>Target Codebase: <strong className="text-ink">{currentProject.name}</strong></span>
+          </div>
+          <span className="truncate max-w-xs text-ink-subtle">{currentProject.workspacePath}</span>
+        </div>
+      )}
 
       {/* Prompt Composer Form */}
       <form onSubmit={handleSubmit} className="p-4 rounded-xl bg-surface border border-line space-y-3.5">

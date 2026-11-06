@@ -12,7 +12,7 @@ interface AgentStatesDockProps {
   selectedPersona: PersonaId;
   onSelectBot: (bot: AgentBot) => void;
   onSelectStation: (station: StationId) => void;
-  theme: SamsTheme;
+  theme?: SamsTheme;
 }
 
 const ALL_STATES: Array<{ id: VisorState; label: string; desc: string }> = [

@@ -24,7 +24,8 @@ interface IsometricRoomProps {
   };
   isDeskBusy: boolean;
   overrideVisorState: VisorState | null;
-  theme: SamsTheme;
+  theme?: SamsTheme;
+  isDark?: boolean;
 }
 
 /**
@@ -137,6 +138,7 @@ export const IsometricRoom: React.FC<IsometricRoomProps> = ({
   isDeskBusy,
   overrideVisorState,
   theme,
+  isDark = false,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const stationRefs = useRef<Record<StationId, HTMLButtonElement | null>>({
@@ -236,10 +238,13 @@ export const IsometricRoom: React.FC<IsometricRoomProps> = ({
     winner.el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   };
 
-  const floorFill = theme === 'blueprint' ? '#EDF3F9' : '#F5EFE6';
-  const wallLeftFill = theme === 'blueprint' ? '#E1EAF4' : '#EAE2D3';
-  const wallRightFill = theme === 'blueprint' ? '#EBF1F8' : '#EEE8DC';
-  const accentStroke = theme === 'blueprint' ? '#3B6EA5' : '#B85D3B';
+  const floorFill = isDark ? '#0F172A' : '#FFFFFF';
+  const wallLeftFill = isDark ? '#161F30' : '#F1F5F9';
+  const wallRightFill = isDark ? '#1E293B' : '#F8FAFC';
+  const gridStroke = isDark ? '#3B82F6' : '#2563EB';
+  const gridOpacity = isDark ? 0.08 : 0.04;
+  const accentStroke = isDark ? '#3B82F6' : '#2563EB';
+  const shadowColor = isDark ? '#000000' : '#0F172A';
 
   return (
     <div
@@ -279,15 +284,15 @@ export const IsometricRoom: React.FC<IsometricRoomProps> = ({
         >
           <defs>
             <filter id="roomShadowLarge" x="-10%" y="-10%" width="120%" height="125%">
-              <feDropShadow dx="0" dy="22" stdDeviation="20" floodColor="#1C1917" floodOpacity="0.14" />
+              <feDropShadow dx="0" dy="22" stdDeviation="20" floodColor={shadowColor} floodOpacity="0.18" />
             </filter>
             {/* Isometric Floor Grid Pattern */}
             <pattern id="isoGridLarge" width="48" height="27.6" patternUnits="userSpaceOnUse">
               <path
                 d="M 24 0 L 48 13.8 L 24 27.6 L 0 13.8 Z"
                 fill="none"
-                stroke="#1C1917"
-                strokeOpacity="0.05"
+                stroke={gridStroke}
+                strokeOpacity={gridOpacity}
                 strokeWidth="1"
               />
             </pattern>
@@ -296,8 +301,8 @@ export const IsometricRoom: React.FC<IsometricRoomProps> = ({
           {/* Ambient Ground Shadow */}
           <polygon
             points="560,642 70,410 560,190 1050,422"
-            fill="#1C1917"
-            fillOpacity="0.05"
+            fill={shadowColor}
+            fillOpacity="0.08"
             filter="url(#roomShadowLarge)"
           />
 
@@ -695,8 +700,8 @@ export const IsometricRoom: React.FC<IsometricRoomProps> = ({
                 'flex items-center gap-2.5 p-2.5 rounded-xl border text-left transition-all cursor-pointer min-h-[50px]',
                 'focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-1',
                 isSelected
-                  ? 'bg-canvas border-ink ring-1.5 ring-ink/20 shadow-xs scale-[1.01]'
-                  : 'bg-surface/70 border-line hover:bg-canvas hover:border-ink/50'
+                  ? 'bg-surface border-blue ring-1.5 ring-blue/30 shadow-xs scale-[1.01]'
+                  : 'bg-surface/70 border-line hover:bg-canvas hover:border-blue/40'
               )}
             >
               <BlackDot
