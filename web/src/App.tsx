@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
   AgentBot,
-  LayoutMode,
   PersonaId,
   StationId,
   StationMeta,
@@ -12,8 +11,9 @@ import {
   TaskPriority,
 } from './types/sams';
 import { ProjectCommandHeader } from './components/projects/ProjectCommandHeader';
-import { ProjectPortfolioMatrix } from './components/projects/ProjectPortfolioMatrix';
+import { PortfolioDrawer } from './components/projects/PortfolioDrawer';
 import { LinkProjectDialog } from './components/projects/LinkProjectDialog';
+import { StationDrawer } from './components/sams/StationDrawer';
 import { IsometricRoom } from './components/sams/IsometricRoom';
 import { AgentStatesDock } from './components/sams/AgentStatesDock';
 import { KanbanWorkbench } from './components/sams/KanbanWorkbench';
@@ -60,12 +60,12 @@ export function App() {
   // Multi-Project State
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [isPortfolioOpen, setIsPortfolioOpen] = useState(false);
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
 
-  // Layout & Navigation State
-  const [activeStation, setActiveStation] = useState<StationId>('desk01');
+  // Progressive Disclosure: Active Drawer (null on arrival for Zen Room)
+  const [activeDrawer, setActiveDrawer] = useState<StationId | null>(null);
   const [vaultSubTab, setVaultSubTab] = useState<'analytics' | 'notes'>('analytics');
-  const [layoutMode, setLayoutMode] = useState<LayoutMode>('split');
 
   // Agent Bot & Visor Telemetry
   const [selectedPersona, setSelectedPersona] = useState<PersonaId>('architect');
@@ -87,7 +87,11 @@ export function App() {
       const res = await fetch('/api/projects');
       if (res.ok) {
         const data = await res.json();
-        setProjects(data.projects || []);
+        const list = data.projects || [];
+        setProjects(list);
+        if (!selectedProjectId && list.length > 0) {
+          setSelectedProjectId(list[0].id);
+        }
       }
     } catch (err) {
       console.error('Failed to fetch projects:', err);
@@ -137,7 +141,7 @@ export function App() {
     }
   }, [liveVisorState]);
 
-  const currentProject = projects.find((p) => p.id === selectedProjectId) || null;
+  const currentProject = projects.find((p) => p.id === selectedProjectId) || (projects.length > 0 ? projects[0] : null);
   const currentTasks = currentProject?.tasks || [];
 
   const isDeskBusy =
@@ -293,7 +297,7 @@ export function App() {
   const stations: Record<StationId, StationMeta> = {
     vault: {
       id: 'vault',
-      title: 'Vault Safe',
+      title: 'Vault',
       subtitle: `Knowledge Base · ${notesCount} Notes`,
       badgeText: `${notesCount} Notes`,
       isBusy: liveVisorState === 'success',
@@ -330,17 +334,17 @@ export function App() {
     },
   };
 
+  const handleSelectStation = (stationId: StationId) => {
+    setActiveDrawer(stationId);
+  };
+
   const handleSelectBot = (bot: AgentBot) => {
     setSelectedPersona(bot.id);
     if (bot.id === 'sentinel') {
-      setActiveStation('security');
+      setActiveDrawer('security');
     } else {
       setActiveDeskPersona(bot.id);
-      if (bot.station === 'whiteboard' || bot.station === 'kanban' || bot.station === 'vault' || bot.station === 'desk01') {
-        setActiveStation(bot.station);
-      } else {
-        setActiveStation('desk01');
-      }
+      setActiveDrawer('desk01');
     }
   };
 
@@ -401,7 +405,7 @@ export function App() {
 
   const handleDispatchTaskToAgent = async (task: ProjectTask) => {
     if (!currentProject) return;
-    setActiveStation('desk01');
+    setActiveDrawer('desk01');
     setSelectedPersona((task.assignedAgent as any) || 'architect');
     setActiveDeskPersona((task.assignedAgent as any) || 'architect');
     setLiveVisorState('researching');
@@ -428,7 +432,6 @@ export function App() {
           persona: (task.assignedAgent as any) || 'architect',
           mode: 'auto',
         });
-        // Move task to in_progress
         handleUpdateTaskStatus(task.id, 'in_progress');
       }
     } catch {
@@ -437,7 +440,7 @@ export function App() {
   };
 
   const handleDispatchWhiteboardPlan = async (planPrompt: string) => {
-    setActiveStation('desk01');
+    setActiveDrawer('desk01');
     setSelectedPersona('architect');
     setActiveDeskPersona('architect');
     setLiveVisorState('researching');
@@ -497,237 +500,159 @@ export function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-canvas text-ink font-sans selection:bg-blue selection:text-white transition-colors duration-200">
-      {/* 1. Top Multi-Project Command Bar */}
+      {/* 1. Slim, Floating Top Bar */}
       <ProjectCommandHeader
-        projects={projects}
-        selectedProjectId={selectedProjectId}
-        onSelectProject={(id) => {
-          setSelectedProjectId(id);
-        }}
+        currentProject={currentProject}
+        onOpenPortfolio={() => setIsPortfolioOpen(true)}
         onOpenLinkDialog={() => setIsLinkDialogOpen(true)}
-        layoutMode={layoutMode}
-        onChangeLayout={setLayoutMode}
         theme={themeMode}
         onToggleTheme={toggleTheme}
         ssdMounted={health?.ssdMounted ?? false}
         freeSpaceGB={health?.freeSpaceGB ?? 0}
       />
 
-      {/* 2. Main Viewport: Either All Projects Portfolio OR Project-Scoped Split Stage */}
-      {selectedProjectId === null ? (
-        /* ================= ALL PROJECTS PORTFOLIO VIEW ================= */
-        <main className="flex-1 overflow-y-auto">
-          <ProjectPortfolioMatrix
-            projects={projects}
-            onSelectProject={(id) => setSelectedProjectId(id)}
-            onOpenLinkDialog={() => setIsLinkDialogOpen(true)}
-            onRefreshProjects={fetchProjects}
-            onToggleTask={handleToggleTask}
+      {/* 2. Main Center Stage: Spacious, Serene 3D Isometric Studio Room */}
+      <main className="flex-1 flex flex-col items-center justify-center p-3 sm:p-6 max-w-6xl w-full mx-auto space-y-4">
+        {/* The 3D Room */}
+        <div className="w-full">
+          <IsometricRoom
+            activeStation={activeDrawer || 'desk01'}
+            onSelectStation={handleSelectStation}
+            bots={bots}
+            onSelectBot={handleSelectBot}
+            stations={stations}
+            kanbanCounts={kanbanCounts}
+            isDeskBusy={isDeskBusy}
+            overrideVisorState={overrideVisorState}
+            isDark={themeMode === 'dark'}
           />
-        </main>
-      ) : (
-        /* ================= SCOPED PROJECT COMMAND STUDIO ================= */
-        <div className="flex-1 flex flex-col">
-          {/* Station Quick-Jump Subheader for Scoped Project */}
-          <nav
-            aria-label="Workspace Stations"
-            className="border-b border-line bg-surface/70 backdrop-blur-xs px-5 py-1"
-          >
-            <div className="max-w-[1440px] mx-auto flex flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-1">
-                {(
-                  [
-                    { id: 'desk01', label: 'Desk 01 (Compute)' },
-                    { id: 'kanban', label: `Kanban (${currentTasks.length} Deliverables)` },
-                    { id: 'whiteboard', label: 'Whiteboard (Plans & Focus)' },
-                    { id: 'security', label: 'Security Gate (Git & Health)' },
-                    { id: 'vault', label: 'Vault (Knowledge & Charts)' },
-                  ] as Array<{ id: StationId; label: string }>
-                ).map((st) => {
-                  const isSelected = activeStation === st.id;
-                  return (
-                    <button
-                      key={st.id}
-                      type="button"
-                      aria-pressed={isSelected}
-                      onClick={() => setActiveStation(st.id)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                        isSelected
-                          ? 'bg-blue text-white shadow-xs font-semibold'
-                          : 'text-ink-muted hover:text-ink hover:bg-elevated'
-                      }`}
-                    >
-                      {st.label}
-                    </button>
-                  );
-                })}
-              </div>
+        </div>
 
-              {/* Scoped Project Name Pill */}
-              <div className="flex items-center gap-2 text-xs font-mono">
-                <span className="text-ink-muted">Scoped to:</span>
-                <span className="font-bold text-ink bg-elevated px-2.5 py-1 rounded border border-line">
-                  {currentProject?.name}
+        {/* Bottom SAMS Agent States HUD Dock */}
+        <div className="w-full">
+          <AgentStatesDock
+            currentGlobalState={computedGlobalState}
+            overrideState={overrideVisorState}
+            onSelectOverrideState={setOverrideVisorState}
+            bots={bots}
+            selectedPersona={selectedPersona}
+            onSelectBot={handleSelectBot}
+            onSelectStation={handleSelectStation}
+          />
+        </div>
+      </main>
+
+      {/* 3. On-Demand Slide-Over Drawer for Selected Station */}
+      <StationDrawer
+        isOpen={activeDrawer !== null}
+        onClose={() => setActiveDrawer(null)}
+        title={activeDrawer ? stations[activeDrawer].title : ''}
+        subtitle={activeDrawer ? stations[activeDrawer].subtitle : ''}
+        badge={activeDrawer ? stations[activeDrawer].badgeText : undefined}
+      >
+        {activeDrawer === 'desk01' && (
+          <AgentConsole
+            currentProject={currentProject}
+            selectedPersona={activeDeskPersona}
+            onSelectPersona={(p) => {
+              setActiveDeskPersona(p);
+              setSelectedPersona(p);
+            }}
+            externalTrigger={externalJobTrigger}
+            onVisorStateChange={handleVisorStateChange}
+          />
+        )}
+
+        {activeDrawer === 'kanban' && (
+          <KanbanWorkbench
+            currentProject={currentProject}
+            tasks={currentTasks}
+            onAddTask={handleAddTask}
+            onUpdateTaskStatus={handleUpdateTaskStatus}
+            onDeleteTask={handleDeleteTask}
+            onDispatchTaskToAgent={handleDispatchTaskToAgent}
+            isBusy={isDeskBusy}
+          />
+        )}
+
+        {activeDrawer === 'whiteboard' && (
+          <WhiteboardWorkbench
+            currentProject={currentProject}
+            onDispatchPlanTask={handleDispatchWhiteboardPlan}
+            onUpdateFocus={handleUpdateProjectFocus}
+            isBusy={isDeskBusy}
+          />
+        )}
+
+        {activeDrawer === 'security' && (
+          <SecurityGateWorkbench
+            currentProject={currentProject}
+            health={health}
+            onRefreshHealth={fetchSystemTelemetry}
+            onRefreshProject={fetchProjects}
+          />
+        )}
+
+        {activeDrawer === 'vault' && (
+          <div className="space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-line">
+              <div className="flex items-center gap-2">
+                <BlackDot pulsing={false} size="sm" />
+                <span className="text-xs font-mono font-bold uppercase text-ink">
+                  Vault Safe Inspector
                 </span>
+              </div>
+              <div className="flex rounded-lg border border-line bg-canvas overflow-hidden text-xs font-mono">
                 <button
                   type="button"
-                  onClick={() => setSelectedProjectId(null)}
-                  className="text-blue hover:underline cursor-pointer"
+                  aria-pressed={vaultSubTab === 'analytics'}
+                  onClick={() => setVaultSubTab('analytics')}
+                  className={`px-3 py-1 cursor-pointer ${
+                    vaultSubTab === 'analytics'
+                      ? 'bg-blue text-white font-semibold'
+                      : 'text-ink-muted hover:text-ink'
+                  }`}
                 >
-                  ← Portfolio
+                  KPIs
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={vaultSubTab === 'notes'}
+                  onClick={() => setVaultSubTab('notes')}
+                  className={`px-3 py-1 cursor-pointer ${
+                    vaultSubTab === 'notes'
+                      ? 'bg-blue text-white font-semibold'
+                      : 'text-ink-muted hover:text-ink'
+                  }`}
+                >
+                  Notes ({notesCount})
                 </button>
               </div>
             </div>
-          </nav>
 
-          {/* Split-Stage Workspace */}
-          <main className="flex-1 max-w-[1440px] w-full mx-auto px-5 py-5">
-            <div
-              className={
-                layoutMode === 'split'
-                  ? 'grid grid-cols-1 lg:grid-cols-12 gap-6 items-start'
-                  : 'space-y-6'
-              }
-            >
-              {/* LEFT PANE: Isometric Room Stage + 6-State Agent Visor Dock */}
-              {(layoutMode === 'split' || layoutMode === 'stage') && (
-                <div
-                  className={
-                    layoutMode === 'split'
-                      ? 'lg:col-span-6 space-y-4 lg:sticky lg:top-16'
-                      : 'max-w-5xl mx-auto space-y-5'
-                  }
-                >
-                  <IsometricRoom
-                    activeStation={activeStation}
-                    onSelectStation={(st) => {
-                      setActiveStation(st);
-                      if (layoutMode === 'stage') {
-                        setLayoutMode('split');
-                      }
-                    }}
-                    bots={bots}
-                    onSelectBot={handleSelectBot}
-                    stations={stations}
-                    kanbanCounts={kanbanCounts}
-                    isDeskBusy={isDeskBusy}
-                    overrideVisorState={overrideVisorState}
-                    isDark={themeMode === 'dark'}
-                  />
+            {vaultSubTab === 'analytics' ? <DashboardGrid /> : <NoteExplorer />}
+          </div>
+        )}
+      </StationDrawer>
 
-                  <AgentStatesDock
-                    currentGlobalState={computedGlobalState}
-                    overrideState={overrideVisorState}
-                    onSelectOverrideState={setOverrideVisorState}
-                    bots={bots}
-                    selectedPersona={selectedPersona}
-                    onSelectBot={handleSelectBot}
-                    onSelectStation={setActiveStation}
-                  />
-                </div>
-              )}
+      {/* 4. Projects Portfolio Sheet (On-demand when clicking top project pill) */}
+      <PortfolioDrawer
+        isOpen={isPortfolioOpen}
+        onClose={() => setIsPortfolioOpen(false)}
+        projects={projects}
+        selectedProjectId={selectedProjectId}
+        onSelectProject={(id) => {
+          setSelectedProjectId(id);
+          setIsPortfolioOpen(false);
+        }}
+        onOpenLinkDialog={() => {
+          setIsPortfolioOpen(false);
+          setIsLinkDialogOpen(true);
+        }}
+        onToggleTask={handleToggleTask}
+      />
 
-              {/* RIGHT PANE: Active Station Workbench */}
-              {(layoutMode === 'split' || layoutMode === 'workbench') && (
-                <aside
-                  aria-label="Active Station Workbench"
-                  className={
-                    layoutMode === 'split'
-                      ? 'lg:col-span-6 rounded-2xl bg-surface border border-line p-5 shadow-xs'
-                      : 'max-w-6xl mx-auto rounded-2xl bg-surface border border-line p-6 shadow-xs'
-                  }
-                >
-                  {activeStation === 'desk01' && (
-                    <AgentConsole
-                      currentProject={currentProject}
-                      selectedPersona={activeDeskPersona}
-                      onSelectPersona={(p) => {
-                        setActiveDeskPersona(p);
-                        setSelectedPersona(p);
-                      }}
-                      externalTrigger={externalJobTrigger}
-                      onVisorStateChange={handleVisorStateChange}
-                    />
-                  )}
-
-                  {activeStation === 'kanban' && (
-                    <KanbanWorkbench
-                      currentProject={currentProject}
-                      tasks={currentTasks}
-                      onAddTask={handleAddTask}
-                      onUpdateTaskStatus={handleUpdateTaskStatus}
-                      onDeleteTask={handleDeleteTask}
-                      onDispatchTaskToAgent={handleDispatchTaskToAgent}
-                      isBusy={isDeskBusy}
-                    />
-                  )}
-
-                  {activeStation === 'whiteboard' && (
-                    <WhiteboardWorkbench
-                      currentProject={currentProject}
-                      onDispatchPlanTask={handleDispatchWhiteboardPlan}
-                      onUpdateFocus={handleUpdateProjectFocus}
-                      isBusy={isDeskBusy}
-                    />
-                  )}
-
-                  {activeStation === 'security' && (
-                    <SecurityGateWorkbench
-                      currentProject={currentProject}
-                      health={health}
-                      onRefreshHealth={fetchSystemTelemetry}
-                      onRefreshProject={fetchProjects}
-                    />
-                  )}
-
-                  {activeStation === 'vault' && (
-                    <div className="space-y-5">
-                      <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-line">
-                        <div className="flex items-center gap-2">
-                          <BlackDot pulsing={false} />
-                          <span className="text-xs font-mono font-bold uppercase text-ink">
-                            Vault Safe Inspector (/Volumes/Akmal SSD/PersonalAI/vault)
-                          </span>
-                        </div>
-                        <div className="flex rounded-lg border border-line bg-canvas overflow-hidden text-xs font-mono">
-                          <button
-                            type="button"
-                            aria-pressed={vaultSubTab === 'analytics'}
-                            onClick={() => setVaultSubTab('analytics')}
-                            className={`px-3 py-1 cursor-pointer ${
-                              vaultSubTab === 'analytics'
-                                ? 'bg-blue text-white font-semibold'
-                                : 'text-ink-muted hover:text-ink'
-                            }`}
-                          >
-                            Recharts & KPIs
-                          </button>
-                          <button
-                            type="button"
-                            aria-pressed={vaultSubTab === 'notes'}
-                            onClick={() => setVaultSubTab('notes')}
-                            className={`px-3 py-1 cursor-pointer ${
-                              vaultSubTab === 'notes'
-                                ? 'bg-blue text-white font-semibold'
-                                : 'text-ink-muted hover:text-ink'
-                            }`}
-                          >
-                            FTS5 Note Graph ({notesCount})
-                          </button>
-                        </div>
-                      </div>
-
-                      {vaultSubTab === 'analytics' ? <DashboardGrid /> : <NoteExplorer />}
-                    </div>
-                  )}
-                </aside>
-              )}
-            </div>
-          </main>
-        </div>
-      )}
-
-      {/* 3. Link Project Native Dialog */}
+      {/* 5. Link Project Native Dialog */}
       <LinkProjectDialog
         isOpen={isLinkDialogOpen}
         onClose={() => setIsLinkDialogOpen(false)}
@@ -736,14 +661,6 @@ export function App() {
           setSelectedProjectId(newProj.id);
         }}
       />
-
-      {/* 4. Footer */}
-      <footer className="border-t border-line py-3 bg-surface/50 text-[11px] font-mono text-ink-muted">
-        <div className="max-w-[1440px] mx-auto px-5 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>SAMS Multi-Project Command Centre · White + Blue Light / Deep Slate Dark Theme</span>
-          <span>Storage: /Volumes/Akmal SSD/PersonalAI/vault · Antigravity Orchestration</span>
-        </div>
-      </footer>
     </div>
   );
 }
