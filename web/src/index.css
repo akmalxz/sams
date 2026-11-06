@@ -1,0 +1,133 @@
+@import "tailwindcss";
+
+@theme {
+  --color-canvas: #F5F2EB;
+  --color-surface: #EFECE4;
+  --color-elevated: #FAF8F4;
+
+  --color-ink: #1C1917;
+  --color-ink-muted: #57534E;
+  --color-ink-subtle: #8C857B;
+
+  --color-line: #D8D1C5;
+
+  --color-terracotta: #B85D3B;
+  --color-olive: #5F6F52;
+  --color-ochre: #C28F42;
+  --color-clay: #8A6A58;
+  --color-slate: #5C6468;
+
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-serif: 'Newsreader', Georgia, Cambria, serif;
+  --font-mono: 'JetBrains Mono', Menlo, Monaco, Consolas, monospace;
+}
+
+@keyframes blackDotPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.25;
+    transform: scale(0.92);
+  }
+}
+
+/* Natural Bot Character Gait & Idle Animations */
+@keyframes botIdleBob {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes botWalkHop {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  25% {
+    transform: translateY(-6px);
+  }
+  50% {
+    transform: translateY(-1px);
+  }
+  75% {
+    transform: translateY(-7px);
+  }
+}
+
+@keyframes shadowIdle {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.22;
+  }
+  50% {
+    transform: scale(0.88);
+    opacity: 0.14;
+  }
+}
+
+@keyframes shadowWalk {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.24;
+  }
+  25%, 75% {
+    transform: scale(0.76);
+    opacity: 0.12;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 0.28;
+  }
+}
+
+.animate-dot-pulse {
+  animation: blackDotPulse 2.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.animate-bot-idle {
+  animation: botIdleBob 3.4s ease-in-out infinite;
+}
+
+.animate-bot-walk {
+  animation: botWalkHop 0.5s ease-in-out infinite;
+}
+
+.animate-shadow-idle {
+  animation: shadowIdle 3.4s ease-in-out infinite;
+}
+
+.animate-shadow-walk {
+  animation: shadowWalk 0.5s ease-in-out infinite;
+}
+
+.visually-hidden:where(:not(:focus-within, :active)) {
+  position: absolute !important;
+  clip-path: inset(50%) !important;
+  overflow: hidden !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  white-space: nowrap !important;
+}
+
+/* Custom scrollbars adhering strictly to earth palette */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-canvas);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-line);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-ink-subtle);
+}

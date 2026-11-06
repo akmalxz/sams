@@ -1,0 +1,17 @@
+{
+  "name": "personal-ai",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev": "bun --filter '*' dev",
+    "server:dev": "bun run --cwd server dev",
+    "server:start": "bun run --cwd server start",
+    "server:test": "bun run --cwd server test",
+    "web:dev": "bun run --cwd web dev",
+    "web:build": "bun run --cwd web build"
+  }
+}
