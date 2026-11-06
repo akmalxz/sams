@@ -499,7 +499,7 @@ export function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-canvas text-ink font-sans selection:bg-blue selection:text-white transition-colors duration-200">
+    <div className="h-screen max-h-screen overflow-hidden flex flex-col bg-canvas text-ink font-sans selection:bg-blue selection:text-white transition-colors duration-200">
       {/* 1. Slim, Floating Top Bar */}
       <ProjectCommandHeader
         currentProject={currentProject}
@@ -511,38 +511,33 @@ export function App() {
         freeSpaceGB={health?.freeSpaceGB ?? 0}
       />
 
-      {/* 2. Main Center Stage: Spacious, Serene 3D Isometric Studio Room */}
-      <main className="flex-1 flex flex-col items-center justify-center p-3 sm:p-6 max-w-6xl w-full mx-auto space-y-4">
-        {/* The 3D Room */}
-        <div className="w-full">
-          <IsometricRoom
-            activeStation={activeDrawer || 'desk01'}
-            onSelectStation={handleSelectStation}
-            bots={bots}
-            onSelectBot={handleSelectBot}
-            stations={stations}
-            kanbanCounts={kanbanCounts}
-            isDeskBusy={isDeskBusy}
-            overrideVisorState={overrideVisorState}
-            isDark={themeMode === 'dark'}
-          />
-        </div>
+      {/* 2. Main Center Stage: 100% Viewport-Fit Room, Zero Scroll */}
+      <main className="flex-1 min-h-0 w-full overflow-hidden relative flex items-center justify-center p-1 sm:p-3">
+        <IsometricRoom
+          activeStation={activeDrawer || 'desk01'}
+          onSelectStation={handleSelectStation}
+          bots={bots}
+          onSelectBot={handleSelectBot}
+          stations={stations}
+          kanbanCounts={kanbanCounts}
+          isDeskBusy={isDeskBusy}
+          overrideVisorState={overrideVisorState}
+          isDark={themeMode === 'dark'}
+        />
 
-        {/* Bottom SAMS Agent States HUD Dock */}
-        <div className="w-full">
-          <AgentStatesDock
-            currentGlobalState={computedGlobalState}
-            overrideState={overrideVisorState}
-            onSelectOverrideState={setOverrideVisorState}
-            bots={bots}
-            selectedPersona={selectedPersona}
-            onSelectBot={handleSelectBot}
-            onSelectStation={handleSelectStation}
-          />
-        </div>
+        {/* 3. Floating Collapsible Agent States HUD in Bottom-Left Corner */}
+        <AgentStatesDock
+          currentGlobalState={computedGlobalState}
+          overrideState={overrideVisorState}
+          onSelectOverrideState={setOverrideVisorState}
+          bots={bots}
+          selectedPersona={selectedPersona}
+          onSelectBot={handleSelectBot}
+          onSelectStation={handleSelectStation}
+        />
       </main>
 
-      {/* 3. On-Demand Slide-Over Drawer for Selected Station */}
+      {/* 4. On-Demand Slide-Over Drawer for Selected Station */}
       <StationDrawer
         isOpen={activeDrawer !== null}
         onClose={() => setActiveDrawer(null)}

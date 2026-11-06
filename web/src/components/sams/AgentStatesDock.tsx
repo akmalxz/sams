@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { clsx } from 'clsx';
-import { AgentBot, PersonaId, SamsTheme, StationId, VisorState } from '../../types/sams';
+import { AgentBot, PersonaId, StationId, VisorState } from '../../types/sams';
 import { AgentVisor } from './AgentVisor';
 import { BlackDot } from '../ui/BlackDot';
 
@@ -12,7 +12,6 @@ interface AgentStatesDockProps {
   selectedPersona: PersonaId;
   onSelectBot: (bot: AgentBot) => void;
   onSelectStation: (station: StationId) => void;
-  theme?: SamsTheme;
 }
 
 const ALL_STATES: Array<{ id: VisorState; label: string; desc: string }> = [
@@ -31,144 +30,153 @@ export const AgentStatesDock: React.FC<AgentStatesDockProps> = ({
   bots,
   selectedPersona,
   onSelectBot,
-  theme,
 }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
   const effectiveState = overrideState || currentGlobalState;
-  const visorFrameColor = theme === 'blueprint' ? '#3B6EA5' : '#8A6A58';
-  const activeFrameColor = theme === 'blueprint' ? '#2563EB' : '#B85D3B';
+
+  // Close on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isExpanded) {
+        setIsExpanded(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isExpanded]);
 
   return (
-    <section
-      aria-label="Agent States and Roster"
-      className="space-y-3"
-    >
-      {/* Top Card: The 6 SAMS Agent States Reference + Live Telemetry Indicator */}
-      <div className="rounded-xl bg-surface/95 border border-line p-4 shadow-xs">
-        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-          <div className="flex items-center gap-2">
-            <BlackDot
-              state={
-                effectiveState === 'active' || effectiveState === 'researching'
-                  ? 'executing'
-                  : effectiveState === 'error'
-                    ? 'error'
-                    : 'idle'
-              }
-              size="sm"
-            />
-            <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-ink">
-              Agent States
-            </h2>
-            <span className="text-[11px] font-mono text-ink-subtle">
-              — Live telemetry state highlighted (click any visor to preview expression)
-            </span>
+    <div className="fixed bottom-4 left-4 z-40 select-none">
+      {/* 1. Collapsed Floating Circle Button */}
+      {!isExpanded ? (
+        <button
+          type="button"
+          onClick={() => setIsExpanded(true)}
+          aria-expanded="false"
+          aria-label="Open SAMS Agent Visor States and Bot Roster"
+          className="group flex items-center gap-2 p-1.5 pr-3.5 rounded-full bg-surface/90 border border-line shadow-xl hover:border-blue/60 hover:shadow-2xl transition-all cursor-pointer backdrop-blur-md"
+          title="Agent States (Click to expand 6-state visor dock)"
+        >
+          <div className="w-10 h-10 rounded-full bg-blue/10 flex items-center justify-center text-blue shrink-0 shadow-2xs">
+            <AgentVisor state={effectiveState} size="sm" decorative frameColor="#2563EB" />
+          </div>
+          <div className="text-left text-xs font-mono">
+            <div className="flex items-center gap-1.5">
+              <span className="font-bold text-ink leading-tight capitalize">{effectiveState}</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-blue animate-pulse" />
+            </div>
+            <span className="text-[10px] text-ink-muted">Visor States ▾</span>
+          </div>
+        </button>
+      ) : (
+        /* 2. Expanded Floating Glass HUD Card */
+        <div className="w-[360px] sm:w-[480px] rounded-2xl bg-surface/95 border border-line p-4 shadow-2xl backdrop-blur-md space-y-3.5 animate-in fade-in slide-in-from-bottom-3 duration-200">
+          {/* Card Header */}
+          <div className="flex items-center justify-between pb-2.5 border-b border-line">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-blue/10 flex items-center justify-center text-blue">
+                <AgentVisor state={effectiveState} size="xs" decorative frameColor="#2563EB" />
+              </div>
+              <div>
+                <h3 className="text-xs font-bold text-ink tracking-tight">SAMS Agent States</h3>
+                <p className="text-[10px] font-mono text-ink-muted">
+                  Live state: <strong className="text-blue capitalize">{effectiveState}</strong>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              {overrideState && (
+                <button
+                  type="button"
+                  onClick={() => onSelectOverrideState(null)}
+                  className="px-2 py-0.5 rounded text-[10px] font-mono text-blue bg-blue/10 hover:bg-blue/20 transition-colors cursor-pointer"
+                >
+                  Reset
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setIsExpanded(false)}
+                aria-label="Collapse Agent States"
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-ink-muted hover:bg-elevated hover:text-ink transition-colors cursor-pointer text-xs"
+              >
+                ✕
+              </button>
+            </div>
           </div>
 
-          {overrideState && (
-            <button
-              type="button"
-              onClick={() => onSelectOverrideState(null)}
-              className="px-2.5 py-1 rounded bg-canvas border border-line text-[11px] font-mono text-ink hover:bg-elevated cursor-pointer transition-colors"
-            >
-              Reset to Live Telemetry ({currentGlobalState.toUpperCase()})
-            </button>
-          )}
-        </div>
-
-        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2.5">
-          {ALL_STATES.map((item) => {
-            const isCurrent = effectiveState === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                aria-pressed={isCurrent}
-                onClick={() =>
-                  onSelectOverrideState(overrideState === item.id ? null : item.id)
-                }
-                className={clsx(
-                  'group flex flex-col items-center justify-center p-2.5 rounded-lg border transition-all cursor-pointer text-center min-h-[88px]',
-                  isCurrent
-                    ? 'bg-elevated border-ink shadow-xs scale-[1.02]'
-                    : 'bg-canvas/60 border-line/70 hover:bg-elevated/70 hover:border-line opacity-80 hover:opacity-100'
-                )}
-              >
-                <AgentVisor
-                  state={item.id}
-                  size="sm"
-                  frameColor={isCurrent ? activeFrameColor : visorFrameColor}
-                  decorative={true}
-                />
-                <div className="mt-2 flex items-center gap-1.5">
-                  {isCurrent && <BlackDot size="sm" />}
+          {/* The 6 Visor Expressions from the SAMS Poster */}
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+            {ALL_STATES.map((item) => {
+              const isCurrent = effectiveState === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() =>
+                    onSelectOverrideState(overrideState === item.id ? null : item.id)
+                  }
+                  className={clsx(
+                    'flex flex-col items-center justify-center p-2 rounded-xl border transition-all cursor-pointer text-center min-h-[76px]',
+                    isCurrent
+                      ? 'bg-blue/10 border-blue shadow-xs scale-[1.03]'
+                      : 'bg-canvas/60 border-line/70 hover:bg-elevated hover:border-line'
+                  )}
+                  title={item.desc}
+                >
+                  <AgentVisor
+                    state={item.id}
+                    size="sm"
+                    frameColor={isCurrent ? '#2563EB' : '#64748B'}
+                    decorative={true}
+                  />
                   <span
                     className={clsx(
-                      'text-xs font-sans tracking-tight',
-                      isCurrent ? 'font-bold text-ink' : 'font-medium text-ink-muted'
+                      'text-[11px] font-sans mt-1.5 tracking-tight',
+                      isCurrent ? 'font-bold text-blue' : 'font-medium text-ink'
                     )}
                   >
                     {item.label}
                   </span>
-                </div>
-                <span className="text-[10px] font-mono text-ink-subtle mt-0.5 line-clamp-1">
-                  {item.desc}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+                </button>
+              );
+            })}
+          </div>
 
-      {/* Bottom Strip: Active Agent Roster (Matching the SAMS Footer Banner) */}
-      <div className="rounded-xl bg-surface/95 border border-line px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <AgentVisor
-            state={effectiveState}
-            size="xs"
-            frameColor={activeFrameColor}
-            decorative={true}
-          />
-          <div>
-            <div className="text-xs font-sans font-bold text-ink tracking-tight">
-              SAMS · Spatial Agentic Operations
-            </div>
-            <div className="text-[11px] font-mono text-ink-muted">
-              8 GB M1 Serial Mutex (`concurrency = 1`) · Only 1 agent occupies Desk 01 at a time
+          {/* Active Bots Roster */}
+          <div className="pt-2 border-t border-line flex flex-wrap items-center justify-between gap-1.5">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-ink-muted">
+              Active Bots (4)
+            </span>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {bots.map((bot) => {
+                const isSelected = selectedPersona === bot.id;
+                return (
+                  <button
+                    key={bot.id}
+                    type="button"
+                    onClick={() => onSelectBot(bot)}
+                    className={clsx(
+                      'inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[10px] font-mono transition-all cursor-pointer',
+                      isSelected
+                        ? 'bg-blue text-white border-blue font-semibold shadow-2xs'
+                        : 'bg-elevated border-line text-ink hover:border-blue/50'
+                    )}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="w-1.5 h-1.5 rounded-full"
+                      style={{ backgroundColor: isSelected ? '#FFFFFF' : bot.bodyColor }}
+                    />
+                    <span>{bot.name}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
-
-        {/* 4 Persona Agent Pills */}
-        <div className="flex flex-wrap items-center gap-2">
-          {bots.map((bot) => {
-            const isSelected = selectedPersona === bot.id;
-            return (
-              <button
-                key={bot.id}
-                type="button"
-                aria-pressed={isSelected}
-                onClick={() => onSelectBot(bot)}
-                className={clsx(
-                  'inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-mono transition-all cursor-pointer',
-                  isSelected
-                    ? 'bg-elevated border-ink text-ink font-semibold shadow-2xs'
-                    : 'bg-canvas border-line text-ink-muted hover:text-ink hover:bg-elevated/60'
-                )}
-              >
-                <span
-                  aria-hidden="true"
-                  className="w-2.5 h-2.5 rounded-full border border-ink/40 shrink-0"
-                  style={{ backgroundColor: bot.bodyColor }}
-                />
-                <span>{bot.name}</span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded bg-surface border border-line text-ink-subtle uppercase">
-                  {bot.station === 'desk01' ? 'Desk 01' : bot.station}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    </section>
+      )}
+    </div>
   );
 };

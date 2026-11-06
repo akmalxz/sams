@@ -250,32 +250,10 @@ export const IsometricRoom: React.FC<IsometricRoomProps> = ({
     <div
       ref={containerRef}
       onKeyDown={handleSpatialKeyDown}
-      className="relative w-full rounded-2xl bg-surface/90 border border-line overflow-hidden shadow-xs select-none"
+      className="relative w-full h-full flex items-center justify-center select-none overflow-hidden"
     >
-      {/* Top Stage Header Overlay */}
-      <div className="px-5 pt-3.5 pb-2.5 flex flex-wrap items-center justify-between gap-2 border-b border-line/60 bg-elevated/60">
-        <div className="flex items-center gap-2.5">
-          <BlackDot state={isDeskBusy ? 'executing' : 'idle'} size="md" />
-          <div>
-            <span className="text-xs font-mono font-bold uppercase tracking-wider text-ink">
-              Spatial Studio Stage
-            </span>
-            <span className="hidden sm:inline text-[11px] font-mono text-ink-muted ml-2">
-              · Expanded 1120×680 studio · Natural bot walking physics
-            </span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 text-[11px] font-mono text-ink-muted">
-          <span>Focused Station:</span>
-          <span className="px-2 py-0.5 rounded bg-canvas border border-line text-ink font-semibold">
-            {stations[activeStation].title}
-          </span>
-        </div>
-      </div>
-
-      {/* Expanded 2.5D Isometric Vector Diorama Canvas (1120 x 680) */}
-      <div className="relative w-full aspect-[16/10] min-h-[440px] max-h-[640px]">
+      {/* 2.5D Isometric Vector Diorama Canvas (1120 x 680) */}
+      <div className="relative w-full h-full flex items-center justify-center max-h-[calc(100vh-64px)] max-w-full aspect-[16/10]">
         <svg
           viewBox="0 0 1120 680"
           role="img"
@@ -673,60 +651,71 @@ export const IsometricRoom: React.FC<IsometricRoomProps> = ({
             />
           );
         })}
-      </div>
+        {/* ================= 9. INTERACTIVE FLOATING CALLOUT BADGES (MATCHING SAMS POSTER) ================= */}
+        {/* 1. Whiteboard */}
+        <button
+          type="button"
+          onClick={() => onSelectStation('whiteboard')}
+          style={{ left: '50%', top: '13%' }}
+          className="absolute -translate-x-1/2 flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface/90 border border-line shadow-lg backdrop-blur-md hover:border-blue hover:scale-105 transition-all cursor-pointer group z-20"
+          title="Whiteboard · Plans & Architecture (Click to open drawer)"
+        >
+          <span className="w-2 h-2 rounded-full bg-amber-400 group-hover:bg-blue transition-colors" />
+          <span className="text-xs font-bold text-ink">Whiteboard</span>
+          <span className="hidden sm:inline text-[10px] text-ink-muted">Plans & Architecture</span>
+        </button>
 
-      {/* ================= 9. SECTION LABELS SHELF (CLEANLY DOCKED OUTSIDE ROOM) ================= */}
-      <div
-        role="tablist"
-        aria-label="Room Sections"
-        className="p-3 border-t border-line/70 bg-elevated/50 grid grid-cols-2 sm:grid-cols-5 gap-2"
-      >
-        {(['vault', 'whiteboard', 'kanban', 'desk01', 'security'] as StationId[]).map((stationId) => {
-          const meta = stations[stationId];
-          const isSelected = activeStation === stationId;
+        {/* 2. Kanban Wall */}
+        <button
+          type="button"
+          onClick={() => onSelectStation('kanban')}
+          style={{ left: '80%', top: '19%' }}
+          className="absolute -translate-x-1/2 flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface/90 border border-line shadow-lg backdrop-blur-md hover:border-blue hover:scale-105 transition-all cursor-pointer group z-20"
+          title="Kanban Wall · Work Items (Click to open drawer)"
+        >
+          <span className="w-2 h-2 rounded-full bg-amber-500 group-hover:bg-blue transition-colors" />
+          <span className="text-xs font-bold text-ink">Kanban Wall</span>
+          <span className="hidden sm:inline text-[10px] text-ink-muted">Work Items ({kanbanCounts.backlog + kanbanCounts.in_progress})</span>
+        </button>
 
-          return (
-            <button
-              key={stationId}
-              ref={(el) => {
-                stationRefs.current[stationId] = el;
-              }}
-              type="button"
-              role="tab"
-              aria-selected={isSelected}
-              tabIndex={isSelected ? 0 : -1}
-              onClick={() => onSelectStation(stationId)}
-              className={clsx(
-                'flex items-center gap-2.5 p-2.5 rounded-xl border text-left transition-all cursor-pointer min-h-[50px]',
-                'focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-1',
-                isSelected
-                  ? 'bg-surface border-blue ring-1.5 ring-blue/30 shadow-xs scale-[1.01]'
-                  : 'bg-surface/70 border-line hover:bg-canvas hover:border-blue/40'
-              )}
-            >
-              <BlackDot
-                state={
-                  meta.hasAlert
-                    ? 'error'
-                    : meta.isBusy
-                      ? 'executing'
-                      : isSelected
-                        ? 'synced'
-                        : 'idle'
-                }
-                size="sm"
-              />
-              <div className="leading-tight overflow-hidden">
-                <div className="text-xs font-sans font-bold text-ink truncate">
-                  {meta.title}
-                </div>
-                <div className="text-[10px] font-mono text-ink-muted truncate">
-                  {meta.subtitle}
-                </div>
-              </div>
-            </button>
-          );
-        })}
+        {/* 3. Vault */}
+        <button
+          type="button"
+          onClick={() => onSelectStation('vault')}
+          style={{ left: '23%', top: '27%' }}
+          className="absolute -translate-x-1/2 flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface/90 border border-line shadow-lg backdrop-blur-md hover:border-blue hover:scale-105 transition-all cursor-pointer group z-20"
+          title="Vault · Secure Storage (Click to open drawer)"
+        >
+          <span className="w-2 h-2 rounded-full bg-emerald-500 group-hover:bg-blue transition-colors" />
+          <span className="text-xs font-bold text-ink">Vault</span>
+          <span className="hidden sm:inline text-[10px] text-ink-muted">Secure Storage</span>
+        </button>
+
+        {/* 4. Desk 01 */}
+        <button
+          type="button"
+          onClick={() => onSelectStation('desk01')}
+          style={{ left: '44%', top: '69%' }}
+          className="absolute -translate-x-1/2 flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface/90 border border-line shadow-lg backdrop-blur-md hover:border-blue hover:scale-105 transition-all cursor-pointer group z-20"
+          title="Desk 01 · Active Compute (Click to open drawer)"
+        >
+          <span className={`w-2 h-2 rounded-full ${isDeskBusy ? 'bg-blue animate-pulse' : 'bg-slate-400'}`} />
+          <span className="text-xs font-bold text-ink">Desk 01</span>
+          <span className="hidden sm:inline text-[10px] text-ink-muted">{isDeskBusy ? 'Active: Compute' : 'Idle'}</span>
+        </button>
+
+        {/* 5. Security Gate */}
+        <button
+          type="button"
+          onClick={() => onSelectStation('security')}
+          style={{ left: '80%', top: '69%' }}
+          className="absolute -translate-x-1/2 flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface/90 border border-line shadow-lg backdrop-blur-md hover:border-blue hover:scale-105 transition-all cursor-pointer group z-20"
+          title="Security Gate · Access Control (Click to open drawer)"
+        >
+          <span className="w-2 h-2 rounded-full bg-emerald-500 group-hover:bg-blue transition-colors" />
+          <span className="text-xs font-bold text-ink">Security Gate</span>
+          <span className="hidden sm:inline text-[10px] text-ink-muted">Access Control</span>
+        </button>
       </div>
     </div>
   );
