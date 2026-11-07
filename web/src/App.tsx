@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Project, ProjectTask } from './types/sams';
+import { Project, ProjectTask, ProjectTaskStatus } from './types/sams';
 import { ProjectRadarCard } from './components/projects/ProjectRadarCard';
 import { LinkProjectDialog } from './components/projects/LinkProjectDialog';
 import { ReanalyzeProjectModal } from './components/projects/ReanalyzeProjectModal';
@@ -26,21 +26,120 @@ export function App() {
     localStorage.setItem('sams-theme', next);
   };
 
+  // Demo initial projects when running purely statically or offline
+  const DEFAULT_DEMO_PROJECTS: Project[] = [
+    {
+      id: 'personal-ai-platform',
+      name: 'Personal AI Platform',
+      workspacePath: '~/Projects/personal_ai',
+      description: 'SAMS Multi-Project Command Centre & 3D Spatial Agent',
+      status: 'on_track',
+      currentFocus: 'Rebuild simple Project Radar & deploy interactive 3D Bot to GitHub Pages',
+      progressPercent: 75,
+      createdAt: Date.now() - 86400000,
+      updatedAt: Date.now(),
+      git: {
+        isGitRepo: true,
+        branch: 'main',
+        uncommittedChanges: 0,
+        lastCommitHash: 'ea2daf3',
+        lastCommitMessage: 'feat(sams): rebuild simple first project radar with interactive 3D companion bot',
+      },
+      tasks: [
+        {
+          id: 't-1',
+          projectId: 'personal-ai-platform',
+          title: 'Rebuild simple project tracking cards',
+          status: 'done',
+          priority: 'high',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        },
+        {
+          id: 't-2',
+          projectId: 'personal-ai-platform',
+          title: 'Procedural 3D SAM Bot with cursor gaze tracking',
+          status: 'done',
+          priority: 'high',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        },
+        {
+          id: 't-3',
+          projectId: 'personal-ai-platform',
+          title: 'Publish to GitHub Pages via automated Actions workflow',
+          status: 'backlog',
+          priority: 'high',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        },
+      ],
+    },
+    {
+      id: 'ewallet-app',
+      name: 'EWallet App',
+      workspacePath: '~/Projects/eWallet_App',
+      description: 'Financial portfolio and modern expense analytics',
+      status: 'on_track',
+      currentFocus: 'Modernizing analytics overview tab with responsive category charts',
+      progressPercent: 50,
+      createdAt: Date.now() - 172800000,
+      updatedAt: Date.now(),
+      git: {
+        isGitRepo: true,
+        branch: 'main',
+        uncommittedChanges: 0,
+        lastCommitHash: '160ee10',
+        lastCommitMessage: 'improve the analytics in the categories tab',
+      },
+      tasks: [
+        {
+          id: 't-4',
+          projectId: 'ewallet-app',
+          title: 'Improve analytics in categories tab',
+          status: 'done',
+          priority: 'medium',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        },
+        {
+          id: 't-5',
+          projectId: 'ewallet-app',
+          title: 'Add interactive budget drilldown widgets',
+          status: 'backlog',
+          priority: 'medium',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        },
+      ],
+    },
+  ];
+
   // Projects State
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [backendOnline, setBackendOnline] = useState(true);
+  const [projects, setProjects] = useState<Project[]>(() => {
+    try {
+      const saved = localStorage.getItem('sams-projects');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return DEFAULT_DEMO_PROJECTS;
+  });
+  const [backendOnline, setBackendOnline] = useState(false);
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
   const [reanalyzingProject, setReanalyzingProject] = useState<Project | null>(null);
   const [filterMode, setFilterMode] = useState<'all' | 'clean' | 'dirty'>('all');
 
-  // Fetch Projects from Backend
+  // Fetch Projects from Backend (with fallback to localStorage/demo)
   const fetchProjects = async () => {
     try {
       const res = await fetch('/api/projects');
       if (res.ok) {
         const data = await res.json();
-        setProjects(data.projects || []);
+        const list = data.projects || [];
+        setProjects(list);
         setBackendOnline(true);
+        try {
+          localStorage.setItem('sams-projects', JSON.stringify(list));
+        } catch {}
       } else {
         setBackendOnline(false);
       }
@@ -55,65 +154,117 @@ export function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // Task & Project Actions
+  // Task & Project Actions (Dual-Mode: Backend API + LocalStorage fallback)
   const handleToggleTask = async (projectId: string, task: ProjectTask) => {
-    const nextStatus = task.status === 'done' ? 'backlog' : 'done';
-    try {
-      await fetch(`/api/projects/${projectId}/tasks/${task.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: nextStatus }),
+    const nextStatus: ProjectTaskStatus = task.status === 'done' ? 'backlog' : 'done';
+
+    // Optimistic / Local update
+    setProjects((prev) => {
+      const updated = prev.map((p) => {
+        if (p.id !== projectId) return p;
+        const newTasks = (p.tasks || []).map((t) =>
+          t.id === task.id ? { ...t, status: nextStatus } : t
+        );
+        return { ...p, tasks: newTasks };
       });
-      fetchProjects();
-    } catch (err) {
-      console.error('Failed to toggle task:', err);
+      try {
+        localStorage.setItem('sams-projects', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    if (backendOnline) {
+      try {
+        await fetch(`/api/projects/${projectId}/tasks/${task.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: nextStatus }),
+        });
+      } catch (err) {
+        console.error('Failed to toggle task on backend:', err);
+      }
     }
   };
 
   const handleAddTask = async (projectId: string, title: string) => {
-    try {
-      await fetch(`/api/projects/${projectId}/tasks`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, priority: 'medium', status: 'backlog' }),
+    const newTask: ProjectTask = {
+      id: `task-${Date.now()}`,
+      projectId,
+      title,
+      priority: 'medium',
+      status: 'backlog',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    setProjects((prev) => {
+      const updated = prev.map((p) => {
+        if (p.id !== projectId) return p;
+        return { ...p, tasks: [...(p.tasks || []), newTask] };
       });
-      fetchProjects();
-    } catch (err) {
-      console.error('Failed to create task:', err);
+      try {
+        localStorage.setItem('sams-projects', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    if (backendOnline) {
+      try {
+        await fetch(`/api/projects/${projectId}/tasks`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, priority: 'medium', status: 'backlog' }),
+        });
+      } catch (err) {
+        console.error('Failed to create task on backend:', err);
+      }
     }
   };
 
   const handleUpdateFocus = async (projectId: string, currentFocus: string) => {
-    try {
-      await fetch(`/api/projects/${projectId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ currentFocus }),
-      });
-      fetchProjects();
-    } catch (err) {
-      console.error('Failed to update focus:', err);
+    setProjects((prev) => {
+      const updated = prev.map((p) =>
+        p.id === projectId ? { ...p, currentFocus } : p
+      );
+      try {
+        localStorage.setItem('sams-projects', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    if (backendOnline) {
+      try {
+        await fetch(`/api/projects/${projectId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ currentFocus }),
+        });
+      } catch (err) {
+        console.error('Failed to update focus on backend:', err);
+      }
     }
   };
 
   const handleUnlinkProject = async (projectId: string) => {
-    try {
-      await fetch(`/api/projects/${projectId}`, { method: 'DELETE' });
-      fetchProjects();
-    } catch (err) {
-      console.error('Failed to unlink project:', err);
+    setProjects((prev) => {
+      const updated = prev.filter((p) => p.id !== projectId);
+      try {
+        localStorage.setItem('sams-projects', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    if (backendOnline) {
+      try {
+        await fetch(`/api/projects/${projectId}`, { method: 'DELETE' });
+      } catch (err) {
+        console.error('Failed to unlink project on backend:', err);
+      }
     }
   };
 
   // Derive Bot Mood & Status Message
   const botTelemetry = useMemo(() => {
-    if (!backendOnline) {
-      return {
-        mood: 'error' as BotMood,
-        message: 'Backend is currently offline. Please run "bun run server" in your terminal.',
-      };
-    }
-
     if (projects.length === 0) {
       return {
         mood: 'focus' as BotMood,
@@ -140,7 +291,9 @@ export function App() {
 
     return {
       mood: 'clean' as BotMood,
-      message: `All ${projects.length} codebases are clean and in sync! Total of ${totalOpenTasks} open deliverables.`,
+      message: backendOnline
+        ? `Live Mac Backend: All ${projects.length} codebases clean and synced! ${totalOpenTasks} open deliverables.`
+        : `Interactive Web Mode: Tracking ${projects.length} codebases with 3D SAM! Run "bun run server" for live Mac Git sync.`,
     };
   }, [projects, backendOnline]);
 
@@ -181,16 +334,16 @@ export function App() {
             className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono border ${
               backendOnline
                 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
-                : 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20'
+                : 'bg-blue/10 text-blue border-blue/20'
             }`}
           >
             <span
               className={`w-2 h-2 rounded-full ${
-                backendOnline ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'
+                backendOnline ? 'bg-emerald-500 animate-pulse' : 'bg-blue'
               }`}
             />
             <span className="hidden md:inline font-medium">
-              {backendOnline ? 'Backend 3001' : 'Backend Offline'}
+              {backendOnline ? 'Live Backend (Mac)' : 'Cloud Web Mode'}
             </span>
           </div>
 
