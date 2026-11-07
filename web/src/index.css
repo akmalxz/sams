@@ -184,16 +184,97 @@
   white-space: nowrap !important;
 }
 
-/* Accessible Native Dialog & Scroll Containment Styling */
+/* Accessible Native Dialog & Top-Layer Entry/Exit Animations */
+dialog {
+  opacity: 0;
+  transform: scale(0.96);
+  transition-property: opacity, transform, display, overlay;
+  transition-duration: 0.22s;
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  transition-behavior: allow-discrete;
+}
+
+dialog.drawer-dialog {
+  transform: translateX(100%);
+}
+
+:is(dialog[open]):where(:not([data-closing])) {
+  opacity: 1;
+  transform: scale(1);
+
+  @starting-style {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+:is(dialog.drawer-dialog[open]):where(:not([data-closing])) {
+  opacity: 1;
+  transform: translateX(0);
+
+  @starting-style {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
 dialog:modal {
   overscroll-behavior: contain;
 }
 
 dialog::backdrop {
-  background: rgba(11, 15, 25, 0.6);
-  backdrop-filter: blur(4px);
+  background-color: rgba(11, 15, 25, 0);
+  backdrop-filter: blur(0px);
   overflow: hidden;
   overscroll-behavior: contain;
+  transition-property: background-color, backdrop-filter, display, overlay;
+  transition-duration: 0.22s;
+  transition-timing-function: ease-out;
+  transition-behavior: allow-discrete;
+}
+
+:is(dialog[open]):where(:not([data-closing]))::backdrop {
+  background-color: rgba(11, 15, 25, 0.6);
+  backdrop-filter: blur(4px);
+
+  @starting-style {
+    background-color: rgba(11, 15, 25, 0);
+    backdrop-filter: blur(0px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  dialog,
+  dialog.drawer-dialog {
+    transform: none;
+    transition-duration: 0.08s;
+  }
+
+  @starting-style {
+    :is(dialog[open], dialog.drawer-dialog[open]):where(:not([data-closing])) {
+      transform: none;
+    }
+  }
+}
+
+/* Auto-growing form textareas with field-sizing: content */
+textarea.auto-grow-textarea {
+  field-sizing: content;
+  height: auto;
+  width: 100%;
+  min-block-size: 3lh;
+  max-block-size: 10lh;
+}
+
+/* Typographic Legibility & Balanced Wrapping */
+h1, h2, h3, .balance-heading {
+  text-wrap: balance;
+}
+
+.prose-preview p,
+.prose-preview li,
+.prose-preview blockquote {
+  text-wrap: pretty;
 }
 
 /* Custom Scrollbars */

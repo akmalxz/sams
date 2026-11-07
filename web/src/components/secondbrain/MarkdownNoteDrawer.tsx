@@ -202,7 +202,7 @@ export const MarkdownNoteDrawer: React.FC<MarkdownNoteDrawerProps> = ({
       aria-labelledby={titleId}
       onClose={onClose}
       {...({ closedby: 'any' } as any)}
-      className="fixed inset-y-0 right-0 left-auto m-0 h-dvh max-h-dvh w-screen max-w-3xl border-l border-line bg-surface p-0 text-ink shadow-2xl outline-none backdrop:bg-slate-950/60 backdrop:backdrop-blur-xs"
+      className="drawer-dialog fixed inset-y-0 right-0 left-auto m-0 h-dvh max-h-dvh w-screen max-w-3xl border-l border-line bg-surface p-0 text-ink shadow-2xl outline-none backdrop:bg-slate-950/60 backdrop:backdrop-blur-xs"
     >
       {note && (
         <div className="flex h-full flex-col">
@@ -337,7 +337,7 @@ export const MarkdownNoteDrawer: React.FC<MarkdownNoteDrawerProps> = ({
                 value={summary}
                 onChange={(e) => setSummary(e.target.value)}
                 placeholder="One-sentence takeaway shown on the main Command Deck..."
-                className="w-full rounded-xl border border-line bg-canvas px-3.5 py-2 text-xs text-ink focus:border-blue focus:outline-none resize-none leading-relaxed"
+                className="auto-grow-textarea w-full rounded-xl border border-line bg-canvas px-3.5 py-2 text-xs text-ink focus:border-blue focus:outline-none resize-none leading-relaxed"
               />
             </div>
 
@@ -377,7 +377,7 @@ export const MarkdownNoteDrawer: React.FC<MarkdownNoteDrawerProps> = ({
                       Formatted Doc
                     </span>
                   </div>
-                  <div className="w-full flex-1 min-h-[340px] rounded-xl border border-line bg-canvas/50 p-4 overflow-y-auto">
+                  <div className="prose-preview w-full flex-1 min-h-[340px] rounded-xl border border-line bg-canvas/50 p-4 overflow-y-auto">
                     {renderMarkdownPreview(content)}
                   </div>
                 </div>

@@ -324,6 +324,7 @@ export function App() {
   const [activeNoteDrawer, setActiveNoteDrawer] = useState<LearningNote | null>(null);
   const [activeMemoryProject, setActiveMemoryProject] = useState<Project | null>(null);
   const [activeMemoryCapsule, setActiveMemoryCapsule] = useState<ProjectMemoryCapsule | null>(null);
+  const [activeMemoryTab, setActiveMemoryTab] = useState<ProjectMemoryDocType>('overview');
   const [isMemoryLoading, setIsMemoryLoading] = useState(false);
   const [backendOnline, setBackendOnline] = useState(false);
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
@@ -367,22 +368,41 @@ export function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // --- Filtered Collections via Global Search ---
+  // --- Filtered Collections via Global Search (Including Vault Memory Capsules) ---
   const normalizedQuery = globalSearchQuery.trim().toLowerCase();
 
-  const filteredProjects = useMemo(() => {
+  const searchMatchedProjects = useMemo(() => {
+    if (!normalizedQuery) return projects;
     return projects.filter((p) => {
-      if (activeProjectDeckFilter !== 'all' && p.id !== activeProjectDeckFilter) return false;
-      if (!normalizedQuery) return true;
       const inTitle = p.name.toLowerCase().includes(normalizedQuery);
+      const inDesc = (p.description || '').toLowerCase().includes(normalizedQuery);
       const inFocus = (p.currentFocus || '').toLowerCase().includes(normalizedQuery);
+      const inPath = (p.workspacePath || '').toLowerCase().includes(normalizedQuery);
       const inRepo = (p.githubRepo || '').toLowerCase().includes(normalizedQuery);
+      const inBranch = (p.git?.branch || '').toLowerCase().includes(normalizedQuery);
       const inTasks = (p.tasks || []).some((t) =>
         t.title.toLowerCase().includes(normalizedQuery)
       );
-      return inTitle || inFocus || inRepo || inTasks;
+
+      // Search inside cached/loaded Vault Memory Capsule (Overview, Theme, Rules, Pulse)
+      let inMemoryCapsule = false;
+      try {
+        const rawCapsule = localStorage.getItem(`sams-memory-${p.id}`);
+        if (rawCapsule && rawCapsule.toLowerCase().includes(normalizedQuery)) {
+          inMemoryCapsule = true;
+        }
+      } catch {}
+
+      return inTitle || inDesc || inFocus || inPath || inRepo || inBranch || inTasks || inMemoryCapsule;
     });
-  }, [projects, activeProjectDeckFilter, normalizedQuery]);
+  }, [projects, normalizedQuery]);
+
+  const filteredProjects = useMemo(() => {
+    return searchMatchedProjects.filter((p) => {
+      if (activeProjectDeckFilter !== 'all' && p.id !== activeProjectDeckFilter) return false;
+      return true;
+    });
+  }, [searchMatchedProjects, activeProjectDeckFilter]);
 
   const filteredLearnings = useMemo(() => {
     if (!normalizedQuery) return learnings;
@@ -858,7 +878,11 @@ ${(project.tasks || []).map((t) => `- [${t.status === 'done' ? 'x' : ' '}] **${t
     };
   };
 
-  const handleOpenProjectMemory = async (project: Project) => {
+  const handleOpenProjectMemory = async (
+    project: Project,
+    initialTab: ProjectMemoryDocType = 'overview'
+  ) => {
+    setActiveMemoryTab(initialTab);
     setActiveMemoryProject(project);
     setIsMemoryLoading(true);
 
@@ -1288,7 +1312,12 @@ ${(project.tasks || []).map((t) => `- [${t.status === 'done' ? 'x' : ' '}] **${t
                 type="search"
                 value={globalSearchQuery}
                 onChange={(e) => setGlobalSearchQuery(e.target.value)}
-                placeholder="Search projects, notes, tasks..."
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape' && !e.nativeEvent.isComposing && e.nativeEvent.keyCode !== 229) {
+                    setGlobalSearchQuery('');
+                  }
+                }}
+                placeholder="Search projects, vault memory, notes, tasks..."
                 aria-label="Search across Second Brain"
                 className="w-full rounded-xl border border-line bg-canvas pl-9 pr-14 py-2 text-xs text-ink placeholder:text-ink-subtle focus:border-blue focus:outline-none transition-colors"
               />
@@ -1327,6 +1356,34 @@ ${(project.tasks || []).map((t) => `- [${t.status === 'done' ? 'x' : ' '}] **${t
             </div>
           </div>
         </div>
+
+        {/* Active Global Search Results Status Bar */}
+        {normalizedQuery && (
+          <div className="px-4 py-2.5 rounded-xl bg-blue/10 border border-blue/20 flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+            <div className="flex items-center gap-2 text-ink">
+              <IconSearch className="w-3.5 h-3.5 text-blue shrink-0" />
+              <span>
+                Showing Second-Brain matches for <strong className="text-blue">"{globalSearchQuery}"</strong>:
+              </span>
+              <span className="px-2 py-0.5 rounded-md bg-surface border border-line text-[11px]">
+                {filteredProjects.length} Projects & Vault Memory
+              </span>
+              <span className="px-2 py-0.5 rounded-md bg-surface border border-line text-[11px]">
+                {filteredLearnings.length} Notes
+              </span>
+              <span className="px-2 py-0.5 rounded-md bg-surface border border-line text-[11px]">
+                {filteredTodos.length} Todos
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setGlobalSearchQuery('')}
+              className="px-2.5 py-1 rounded-lg bg-surface border border-line text-ink-muted hover:text-ink text-[11px] font-semibold cursor-pointer"
+            >
+              Clear Filter (Esc)
+            </button>
+          </div>
+        )}
 
         {/* Mobile View Switcher */}
         <div className="flex md:hidden items-center justify-around bg-elevated/70 p-1 rounded-xl border border-line text-xs font-mono">
@@ -1471,7 +1528,10 @@ ${(project.tasks || []).map((t) => `- [${t.status === 'done' ? 'x' : ' '}] **${t
 
             {/* Bottom: Unified Cross-Project Kanban Board */}
             <UnifiedKanbanBoard
-              projects={filteredProjects}
+              projects={searchMatchedProjects}
+              selectedProjectFilter={activeProjectDeckFilter}
+              onSelectProjectFilter={setActiveProjectDeckFilter}
+              onOpenProjectMemory={handleOpenProjectMemory}
               onUpdateTaskStatus={handleUpdateTaskStatus}
               onAddTask={handleAddTask}
               onDeleteTask={handleDeleteTask}
@@ -1514,6 +1574,7 @@ ${(project.tasks || []).map((t) => `- [${t.status === 'done' ? 'x' : ' '}] **${t
         onClose={() => setActiveMemoryProject(null)}
         memoryCapsule={activeMemoryCapsule}
         isLoading={isMemoryLoading}
+        initialTab={activeMemoryTab}
         onSaveDoc={handleSaveMemoryDoc}
         onRegenerate={handleRegenerateMemory}
       />

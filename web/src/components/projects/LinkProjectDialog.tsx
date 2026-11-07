@@ -375,7 +375,7 @@ export const LinkProjectDialog: React.FC<LinkProjectDialogProps> = ({
                 rows={2}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="w-full rounded-lg border border-line bg-canvas px-3 py-2 text-xs text-ink focus:border-blue focus:outline-none resize-none leading-relaxed"
+                className="auto-grow-textarea w-full rounded-lg border border-line bg-canvas px-3 py-2 text-xs text-ink focus:border-blue focus:outline-none resize-none leading-relaxed"
               />
             </div>
 
@@ -494,7 +494,7 @@ export const LinkProjectDialog: React.FC<LinkProjectDialogProps> = ({
                 value={customRules}
                 onChange={(e) => setCustomRules(e.target.value)}
                 placeholder="- Always use bun for package commands&#10;- Strict TypeScript types&#10;- Maintain test suite passes"
-                className="w-full rounded-lg border border-line bg-canvas px-3 py-2 text-xs font-mono text-ink focus:border-blue focus:outline-none resize-none leading-relaxed"
+                className="auto-grow-textarea w-full rounded-lg border border-line bg-canvas px-3 py-2 text-xs font-mono text-ink focus:border-blue focus:outline-none resize-none leading-relaxed"
               />
               <p className="text-[11px] text-ink-muted mt-0.5">
                 Agent guardrails and preferences saved into your Obsidian Vault to steer future tasks.

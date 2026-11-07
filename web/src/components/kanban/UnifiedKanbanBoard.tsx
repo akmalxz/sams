@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
-import { Project, ProjectTask, ProjectTaskStatus } from '../../types/sams';
-import { IconCheck, IconGripVertical, IconKanban, IconTrash } from '../ui/Icons';
+import { Project, ProjectMemoryDocType, ProjectTask, ProjectTaskStatus } from '../../types/sams';
+import { IconBrain, IconCheck, IconGripVertical, IconKanban, IconTrash } from '../ui/Icons';
 
 interface UnifiedKanbanBoardProps {
   projects: Project[];
+  selectedProjectFilter?: string;
+  onSelectProjectFilter?: (projectId: string) => void;
+  onOpenProjectMemory?: (project: Project, initialTab?: ProjectMemoryDocType) => void;
   onUpdateTaskStatus: (projectId: string, taskId: string, newStatus: ProjectTaskStatus) => void;
   onAddTask: (
     projectId: string,
@@ -55,11 +58,25 @@ const STATUS_LABELS: Record<ProjectTaskStatus, string> = {
 
 export const UnifiedKanbanBoard: React.FC<UnifiedKanbanBoardProps> = ({
   projects,
+  selectedProjectFilter: controlledFilter,
+  onSelectProjectFilter,
+  onOpenProjectMemory,
   onUpdateTaskStatus,
   onAddTask,
   onDeleteTask,
 }) => {
-  const [selectedProjectFilter, setSelectedProjectFilter] = useState<string>('all');
+  const [internalFilter, setInternalFilter] = useState<string>('all');
+  const selectedProjectFilter = controlledFilter ?? internalFilter;
+  const setSelectedProjectFilter = (id: string) => {
+    setInternalFilter(id);
+    onSelectProjectFilter?.(id);
+  };
+
+  const activeFocusedProject =
+    selectedProjectFilter !== 'all'
+      ? projects.find((p) => p.id === selectedProjectFilter) || null
+      : null;
+
   const [isAddingTask, setIsAddingTask] = useState<ProjectTaskStatus | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskPriority, setNewTaskPriority] = useState<'low' | 'medium' | 'high'>('medium');
@@ -144,33 +161,47 @@ export const UnifiedKanbanBoard: React.FC<UnifiedKanbanBoardProps> = ({
           </div>
         </div>
 
-        {/* Project Switcher Filter */}
-        <div className="flex flex-wrap items-center gap-1 bg-elevated/70 p-1 rounded-xl border border-line text-xs font-mono">
-          <button
-            type="button"
-            onClick={() => setSelectedProjectFilter('all')}
-            className={`px-3 py-1 rounded-lg cursor-pointer transition-colors ${
-              selectedProjectFilter === 'all'
-                ? 'bg-surface text-ink font-bold shadow-2xs'
-                : 'text-ink-muted hover:text-ink'
-            }`}
-          >
-            All Projects ({projects.reduce((acc, p) => acc + (p.tasks?.length || 0), 0)})
-          </button>
-          {projects.map((p) => (
+        {/* Project Switcher Filter + Active Project Vault Memory Shortcut */}
+        <div className="flex flex-wrap items-center gap-2">
+          {activeFocusedProject && onOpenProjectMemory && (
             <button
-              key={p.id}
               type="button"
-              onClick={() => setSelectedProjectFilter(p.id)}
-              className={`px-2.5 py-1 rounded-lg cursor-pointer transition-colors truncate max-w-[150px] ${
-                selectedProjectFilter === p.id
-                  ? 'bg-surface text-blue font-bold shadow-2xs'
+              onClick={() => onOpenProjectMemory(activeFocusedProject, 'pulse')}
+              className="px-3 py-1.5 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 hover:bg-purple-500/20 text-xs font-mono font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
+              title={`Open ${activeFocusedProject.name} Vault Memory Capsule`}
+            >
+              <IconBrain className="w-3.5 h-3.5 text-purple-500" />
+              <span>{activeFocusedProject.name} Vault Memory</span>
+            </button>
+          )}
+
+          <div className="flex flex-wrap items-center gap-1 bg-elevated/70 p-1 rounded-xl border border-line text-xs font-mono">
+            <button
+              type="button"
+              onClick={() => setSelectedProjectFilter('all')}
+              className={`px-3 py-1 rounded-lg cursor-pointer transition-colors ${
+                selectedProjectFilter === 'all'
+                  ? 'bg-surface text-ink font-bold shadow-2xs'
                   : 'text-ink-muted hover:text-ink'
               }`}
             >
-              {p.name} ({p.tasks?.length || 0})
+              All Projects ({projects.reduce((acc, p) => acc + (p.tasks?.length || 0), 0)})
             </button>
-          ))}
+            {projects.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setSelectedProjectFilter(p.id)}
+                className={`px-2.5 py-1 rounded-lg cursor-pointer transition-colors truncate max-w-[150px] ${
+                  selectedProjectFilter === p.id
+                    ? 'bg-surface text-blue font-bold shadow-2xs'
+                    : 'text-ink-muted hover:text-ink'
+                }`}
+              >
+                {p.name} ({p.tasks?.length || 0})
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

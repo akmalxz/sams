@@ -10,6 +10,7 @@ interface ProjectMemoryDrawerProps {
   onRegenerate?: () => Promise<void>;
   memoryCapsule?: ProjectMemoryCapsule | null;
   isLoading?: boolean;
+  initialTab?: ProjectMemoryDocType;
 }
 
 const TAB_CONFIG: Array<{
@@ -32,12 +33,20 @@ export const ProjectMemoryDrawer: React.FC<ProjectMemoryDrawerProps> = ({
   onRegenerate,
   memoryCapsule,
   isLoading = false,
+  initialTab = 'overview',
 }) => {
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const titleId = useId();
 
-  const [activeTab, setActiveTab] = useState<ProjectMemoryDocType>('overview');
+  const [activeTab, setActiveTab] = useState<ProjectMemoryDocType>(initialTab);
   const [viewMode, setViewMode] = useState<'split' | 'write' | 'preview'>('split');
+
+  // Sync activeTab when initialTab or project changes on open
+  useEffect(() => {
+    if (isOpen && initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab, project?.id]);
 
   // Per-tab doc contents
   const [docContents, setDocContents] = useState<Record<ProjectMemoryDocType, string>>({
@@ -51,6 +60,8 @@ export const ProjectMemoryDrawer: React.FC<ProjectMemoryDrawerProps> = ({
   const [isSaved, setIsSaved] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copiedSwatch, setCopiedSwatch] = useState<string | null>(null);
+  const [quickRuleInput, setQuickRuleInput] = useState('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<Record<ProjectMemoryDocType, boolean>>({
     overview: false,
     theme: false,
@@ -69,7 +80,6 @@ export const ProjectMemoryDrawer: React.FC<ProjectMemoryDrawerProps> = ({
       });
       setHasUnsavedChanges({ overview: false, theme: false, rules: false, pulse: false });
     } else if (project) {
-      // Fallback empty templates if capsule is not yet loaded
       setDocContents({
         overview: `# Project Charter: ${project.name}\n\n${project.description || 'No description provided.'}\n\n### Current Focus\n${project.currentFocus || 'Initial planning.'}`,
         theme: `# UI Theme & Design System DNA: ${project.name}\n\n- Styling Engine: Auto-detected\n- Color Palette: SAMS default tokens`,
@@ -144,6 +154,36 @@ export const ProjectMemoryDrawer: React.FC<ProjectMemoryDrawerProps> = ({
     }
   };
 
+  // Keyboard shortcut Cmd+S / Ctrl+S to save active Vault document
+  useEffect(() => {
+    if (!isOpen || !project) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        handleSaveCurrentDoc();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, project, activeTab, docContents]);
+
+  const handleQuickAddRule = (e: React.FormEvent) => {
+    e.preventDefault();
+    const ruleText = quickRuleInput.trim();
+    if (!ruleText) return;
+    const formattedRule = ruleText.startsWith('- ') ? ruleText : `- ${ruleText}`;
+    const updatedRules = `${docContents.rules.trimEnd()}\n${formattedRule}\n`;
+    setDocContents((prev) => ({ ...prev, rules: updatedRules }));
+    setHasUnsavedChanges((prev) => ({ ...prev, rules: true }));
+    setQuickRuleInput('');
+  };
+
+  const handleCopySwatch = (name: string, value: string) => {
+    navigator.clipboard.writeText(value);
+    setCopiedSwatch(name);
+    setTimeout(() => setCopiedSwatch(null), 1500);
+  };
+
   const handleRegenerate = async () => {
     if (!onRegenerate) return;
     setIsRegenerating(true);
@@ -204,144 +244,205 @@ export const ProjectMemoryDrawer: React.FC<ProjectMemoryDrawerProps> = ({
     }
   };
 
-  // Markdown renderer for technical documentation, code blocks, tables, lists
-  const renderMarkdownPreview = (md: string) => {
-    const segments = md.split(/(```[\s\S]*?```)/g);
-    return segments.map((segment, index) => {
-      if (segment.startsWith('```') && segment.endsWith('```')) {
-        const lines = segment.slice(3, -3).trim().split('\n');
-        const firstLine = lines[0]?.trim() || '';
-        const hasLang = /^[a-zA-Z0-9_-]+$/.test(firstLine);
-        const lang = hasLang ? firstLine : 'code';
-        const code = hasLang ? lines.slice(1).join('\n') : lines.join('\n');
+  // Parse YAML frontmatter if present and return { frontmatterEntries, bodyMd }
+  const parseFrontmatter = (rawMd: string): { entries: Array<{ key: string; val: string }>; body: string } => {
+    const match = rawMd.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+    if (!match) return { entries: [], body: rawMd };
 
-        return (
-          <div key={index} className="my-3 rounded-xl overflow-hidden border border-line bg-canvas">
-            <div className="px-3 py-1.5 bg-elevated/80 border-b border-line flex items-center justify-between text-[10px] font-mono text-ink-muted">
-              <span className="uppercase font-semibold text-blue">{lang}</span>
-              <button
-                type="button"
-                onClick={() => navigator.clipboard.writeText(code)}
-                className="hover:text-ink cursor-pointer flex items-center gap-1"
-              >
-                <IconCopy className="w-3 h-3" />
-                <span>Copy snippet</span>
-              </button>
-            </div>
-            <pre className="p-3 text-xs font-mono text-ink overflow-x-auto leading-relaxed">
-              <code>{code}</code>
-            </pre>
-          </div>
-        );
+    const yamlBlock = match[1];
+    const body = match[2];
+    const entries: Array<{ key: string; val: string }> = [];
+
+    for (const line of yamlBlock.split('\n')) {
+      const m = line.match(/^([a-zA-Z0-9_-]+):\s*(.+)$/);
+      if (m) {
+        const key = m[1].trim();
+        const val = m[2].trim().replace(/^["']|["']$/g, '');
+        if (val && val !== '[]') {
+          entries.push({ key, val });
+        }
       }
+    }
+    return { entries, body };
+  };
 
-      const blocks = segment.split('\n\n').filter((b) => b.trim().length > 0);
-      return (
-        <div key={index} className="space-y-3">
-          {blocks.map((block, bIdx) => {
-            const trimmed = block.trim();
+  // Markdown renderer for technical documentation, YAML frontmatter properties, code blocks, tables, lists
+  const renderMarkdownPreview = (md: string) => {
+    const { entries: frontmatterEntries, body } = parseFrontmatter(md);
+    const segments = body.split(/(```[\s\S]*?```)/g);
 
-            // Headings
-            if (trimmed.startsWith('# ')) {
-              return (
-                <h1 key={bIdx} className="text-base font-bold text-ink tracking-tight pt-2 border-b border-line/60 pb-1.5">
-                  {trimmed.slice(2)}
-                </h1>
-              );
-            }
-            if (trimmed.startsWith('## ')) {
-              return (
-                <h2 key={bIdx} className="text-sm font-bold text-ink pt-2 pb-0.5 border-b border-line/30">
-                  {trimmed.slice(3)}
-                </h2>
-              );
-            }
-            if (trimmed.startsWith('### ')) {
-              return (
-                <h3 key={bIdx} className="text-xs font-bold uppercase tracking-wider text-blue pt-2">
-                  {trimmed.slice(4)}
-                </h3>
-              );
-            }
+    return (
+      <div className="prose-preview space-y-4">
+        {/* Obsidian-Style Frontmatter Properties Card */}
+        {frontmatterEntries.length > 0 && (
+          <div className="rounded-xl border border-line bg-elevated/40 p-3 space-y-2">
+            <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-ink-muted">
+              <span>Obsidian Vault Properties</span>
+              <span className="text-blue font-semibold">YAML Frontmatter</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {frontmatterEntries.slice(0, 8).map((item, idx) => (
+                <div
+                  key={idx}
+                  className="px-2 py-0.5 rounded-md bg-canvas border border-line/70 text-[10px] font-mono flex items-center gap-1.5"
+                >
+                  <span className="text-ink-subtle">{item.key}:</span>
+                  <span className="text-ink font-semibold truncate max-w-[160px]">{item.val}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
-            // Bullet Lists
-            if (trimmed.split('\n').every((l) => l.trim().startsWith('- ') || l.trim().startsWith('* '))) {
-              return (
-                <ul key={bIdx} className="space-y-1.5 pl-4 list-disc text-xs text-ink leading-relaxed">
-                  {trimmed.split('\n').map((item, i) => {
-                    const line = item.trim().replace(/^[-*]\s+/, '');
-                    const isCheckbox = line.startsWith('[ ] ') || line.startsWith('[x] ');
-                    if (isCheckbox) {
-                      const isChecked = line.startsWith('[x] ');
-                      const taskText = line.slice(4);
-                      return (
-                        <li key={i} className="list-none -ml-4 flex items-center gap-2">
-                          <input type="checkbox" readOnly checked={isChecked} className="rounded text-blue" />
-                          <span className={isChecked ? 'line-through text-ink-muted' : 'text-ink'}>{taskText}</span>
-                        </li>
-                      );
-                    }
-                    return <li key={i}>{line}</li>;
-                  })}
-                </ul>
-              );
-            }
+        {segments.map((segment, index) => {
+          if (segment.startsWith('```') && segment.endsWith('```')) {
+            const lines = segment.slice(3, -3).trim().split('\n');
+            const firstLine = lines[0]?.trim() || '';
+            const hasLang = /^[a-zA-Z0-9_-]+$/.test(firstLine);
+            const lang = hasLang ? firstLine : 'code';
+            const code = hasLang ? lines.slice(1).join('\n') : lines.join('\n');
 
-            // Tables
-            if (trimmed.includes('|') && trimmed.split('\n').length >= 2) {
-              const rows = trimmed.split('\n').filter((r) => r.trim().startsWith('|'));
-              if (rows.length >= 2) {
-                const headerCols = rows[0].split('|').map((c) => c.trim()).filter(Boolean);
-                const dataRows = rows.slice(2);
-                return (
-                  <div key={bIdx} className="my-2 overflow-x-auto rounded-lg border border-line">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-elevated/70 border-b border-line font-semibold text-ink">
-                        <tr>
-                          {headerCols.map((col, cIdx) => (
-                            <th key={cIdx} className="px-3 py-1.5">{col}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-line/50 font-mono text-[11px] text-ink">
-                        {dataRows.map((r, rIdx) => {
-                          const cols = r.split('|').map((c) => c.trim()).filter(Boolean);
+            return (
+              <div key={index} className="my-3 rounded-xl overflow-hidden border border-line bg-canvas">
+                <div className="px-3 py-1.5 bg-elevated/80 border-b border-line flex items-center justify-between text-[10px] font-mono text-ink-muted">
+                  <span className="uppercase font-semibold text-blue">{lang}</span>
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard.writeText(code)}
+                    className="hover:text-ink cursor-pointer flex items-center gap-1"
+                  >
+                    <IconCopy className="w-3 h-3" />
+                    <span>Copy snippet</span>
+                  </button>
+                </div>
+                <pre className="p-3 text-xs font-mono text-ink overflow-x-auto leading-relaxed">
+                  <code>{code}</code>
+                </pre>
+              </div>
+            );
+          }
+
+          const blocks = segment.split('\n\n').filter((b) => b.trim().length > 0);
+          return (
+            <div key={index} className="space-y-3">
+              {blocks.map((block, bIdx) => {
+                const trimmed = block.trim();
+
+                // Headings
+                if (trimmed.startsWith('# ')) {
+                  return (
+                    <h1 key={bIdx} className="text-base font-bold text-ink tracking-tight pt-1 border-b border-line/60 pb-1.5">
+                      {trimmed.slice(2)}
+                    </h1>
+                  );
+                }
+                if (trimmed.startsWith('## ')) {
+                  return (
+                    <h2 key={bIdx} className="text-sm font-bold text-ink pt-2 pb-0.5 border-b border-line/30">
+                      {trimmed.slice(3)}
+                    </h2>
+                  );
+                }
+                if (trimmed.startsWith('### ')) {
+                  return (
+                    <h3 key={bIdx} className="text-xs font-bold uppercase tracking-wider text-blue pt-1.5">
+                      {trimmed.slice(4)}
+                    </h3>
+                  );
+                }
+
+                // Blockquotes
+                if (trimmed.startsWith('> ')) {
+                  return (
+                    <blockquote
+                      key={bIdx}
+                      className="border-l-2 border-blue/60 bg-blue/5 px-3 py-2 rounded-r-lg text-xs text-ink italic leading-relaxed"
+                    >
+                      {trimmed.replace(/^>\s+/gm, '')}
+                    </blockquote>
+                  );
+                }
+
+                // Bullet Lists
+                if (trimmed.split('\n').every((l) => l.trim().startsWith('- ') || l.trim().startsWith('* '))) {
+                  return (
+                    <ul key={bIdx} className="space-y-1.5 pl-4 list-disc text-xs text-ink leading-relaxed">
+                      {trimmed.split('\n').map((item, i) => {
+                        const line = item.trim().replace(/^[-*]\s+/, '');
+                        const isCheckbox = line.startsWith('[ ] ') || line.startsWith('[x] ');
+                        if (isCheckbox) {
+                          const isChecked = line.startsWith('[x] ');
+                          const taskText = line.slice(4);
                           return (
-                            <tr key={rIdx} className="hover:bg-elevated/30">
-                              {cols.map((col, cIdx) => (
-                                <td key={cIdx} className="px-3 py-1.5 whitespace-nowrap">{col}</td>
+                            <li key={i} className="list-none -ml-4 flex items-center gap-2">
+                              <input type="checkbox" readOnly checked={isChecked} className="rounded text-blue" />
+                              <span className={isChecked ? 'line-through text-ink-muted' : 'text-ink'}>{taskText}</span>
+                            </li>
+                          );
+                        }
+                        return <li key={i}>{line}</li>;
+                      })}
+                    </ul>
+                  );
+                }
+
+                // Tables
+                if (trimmed.includes('|') && trimmed.split('\n').length >= 2) {
+                  const rows = trimmed.split('\n').filter((r) => r.trim().startsWith('|'));
+                  if (rows.length >= 2) {
+                    const headerCols = rows[0].split('|').map((c) => c.trim()).filter(Boolean);
+                    const dataRows = rows.slice(2);
+                    return (
+                      <div key={bIdx} className="my-2 overflow-x-auto rounded-lg border border-line">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-elevated/70 border-b border-line font-semibold text-ink">
+                            <tr>
+                              {headerCols.map((col, cIdx) => (
+                                <th key={cIdx} className="px-3 py-1.5">{col}</th>
                               ))}
                             </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                );
-              }
-            }
+                          </thead>
+                          <tbody className="divide-y divide-line/50 font-mono text-[11px] text-ink">
+                            {dataRows.map((r, rIdx) => {
+                              const cols = r.split('|').map((c) => c.trim()).filter(Boolean);
+                              return (
+                                <tr key={rIdx} className="hover:bg-elevated/30">
+                                  {cols.map((col, cIdx) => (
+                                    <td key={cIdx} className="px-3 py-1.5 whitespace-nowrap">{col}</td>
+                                  ))}
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                  }
+                }
 
-            // Paragraph with inline code parsing
-            return (
-              <p key={bIdx} className="text-xs text-ink-muted leading-relaxed">
-                {trimmed.split(/(`[^`]+`)/g).map((part, pIdx) =>
-                  part.startsWith('`') && part.endsWith('`') ? (
-                    <code
-                      key={pIdx}
-                      className="px-1.5 py-0.5 rounded bg-elevated border border-line font-mono text-[11px] text-ink"
-                    >
-                      {part.slice(1, -1)}
-                    </code>
-                  ) : (
-                    part
-                  )
-                )}
-              </p>
-            );
-          })}
-        </div>
-      );
-    });
+                // Paragraph with inline code parsing
+                return (
+                  <p key={bIdx} className="text-xs text-ink-muted leading-relaxed">
+                    {trimmed.split(/(`[^`]+`)/g).map((part, pIdx) =>
+                      part.startsWith('`') && part.endsWith('`') ? (
+                        <code
+                          key={pIdx}
+                          className="px-1.5 py-0.5 rounded bg-elevated border border-line font-mono text-[11px] text-ink"
+                        >
+                          {part.slice(1, -1)}
+                        </code>
+                      ) : (
+                        part
+                      )
+                    )}
+                  </p>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+    );
   };
 
   const currentTabConfig = TAB_CONFIG.find((t) => t.id === activeTab)!;
@@ -354,7 +455,7 @@ export const ProjectMemoryDrawer: React.FC<ProjectMemoryDrawerProps> = ({
       aria-labelledby={titleId}
       onClose={onClose}
       {...({ closedby: 'any' } as any)}
-      className="fixed inset-y-0 right-0 left-auto m-0 h-dvh max-h-dvh w-screen max-w-4xl border-l border-line bg-surface p-0 text-ink shadow-2xl outline-none backdrop:bg-slate-950/60 backdrop:backdrop-blur-xs overscroll-contain"
+      className="drawer-dialog fixed inset-y-0 right-0 left-auto m-0 h-dvh max-h-dvh w-screen max-w-4xl border-l border-line bg-surface p-0 text-ink shadow-2xl outline-none backdrop:bg-slate-950/60 backdrop:backdrop-blur-xs overscroll-contain"
     >
       {project && (
         <div className="flex h-full flex-col">
@@ -374,7 +475,7 @@ export const ProjectMemoryDrawer: React.FC<ProjectMemoryDrawerProps> = ({
                 <div className="flex items-center gap-2 text-[10px] font-mono text-ink-muted mt-0.5">
                   <span className="truncate max-w-xs">{vaultPath}/{currentTabConfig.fileName}</span>
                   <span>·</span>
-                  <span>Persistent Markdown Capsule</span>
+                  <span>⌘S to save · Esc to close</span>
                 </div>
               </div>
             </div>
@@ -454,7 +555,7 @@ export const ProjectMemoryDrawer: React.FC<ProjectMemoryDrawerProps> = ({
                       <span>Saved</span>
                     </>
                   ) : hasUnsavedChanges[activeTab] ? (
-                    'Save Changes'
+                    <span>Save (⌘S)</span>
                   ) : (
                     'Saved'
                   )}
@@ -496,43 +597,116 @@ export const ProjectMemoryDrawer: React.FC<ProjectMemoryDrawerProps> = ({
             })}
           </div>
 
-          {/* Active Tab Interactive Header Widget (Theme Swatches / Architecture) */}
-          {activeTab === 'theme' && memoryCapsule?.themeProfile && (
-            <div className="px-6 py-2.5 bg-elevated/40 border-b border-line flex flex-wrap items-center justify-between gap-2 shrink-0">
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-muted">Detected Styling:</span>
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-canvas border border-line text-blue font-bold">
-                  {memoryCapsule.themeProfile.stylingEngine}
+          {/* 1. Overview Tab Interactive Architecture Widget */}
+          {activeTab === 'overview' && memoryCapsule?.architectureMap && (
+            <div className="px-6 py-2.5 bg-elevated/40 border-b border-line flex flex-wrap items-center justify-between gap-2 shrink-0 text-[11px] font-mono">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-muted mr-1">
+                  Architecture:
                 </span>
-                <span className="text-[10px] font-mono text-ink-subtle">
-                  mode: {memoryCapsule.themeProfile.themeMode}
-                </span>
+                {memoryCapsule.architectureMap.directories.slice(0, 5).map((dir, i) => (
+                  <span
+                    key={i}
+                    className="px-2 py-0.5 rounded bg-canvas border border-line text-ink"
+                    title={dir.role}
+                  >
+                    📂 {dir.name}/ <span className="text-ink-subtle">({dir.role.split(' ')[0]})</span>
+                  </span>
+                ))}
               </div>
-
-              {memoryCapsule.themeProfile.colorTokens && memoryCapsule.themeProfile.colorTokens.length > 0 && (
-                <div className="flex items-center gap-1.5 overflow-x-auto max-w-md py-0.5">
-                  {memoryCapsule.themeProfile.colorTokens.slice(0, 8).map((tok, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-line/60 bg-canvas text-[10px] font-mono text-ink shrink-0"
-                      title={`${tok.name}: ${tok.value}`}
-                    >
-                      <span className="w-2.5 h-2.5 rounded-full border border-black/20 shrink-0" style={{ backgroundColor: tok.value }} />
-                      <span className="truncate max-w-[70px]">{tok.name}</span>
-                    </div>
+              {memoryCapsule.architectureMap.safeEnvKeys.length > 0 && (
+                <div className="flex items-center gap-1 text-[10px] text-ink-muted">
+                  <span>env keys:</span>
+                  {memoryCapsule.architectureMap.safeEnvKeys.slice(0, 4).map((k) => (
+                    <code key={k} className="px-1.5 py-0.2 rounded bg-canvas border border-line text-ink">
+                      {k}
+                    </code>
                   ))}
                 </div>
               )}
             </div>
           )}
 
-          {activeTab === 'rules' && memoryCapsule?.workingRules && (
-            <div className="px-6 py-2 bg-elevated/40 border-b border-line flex items-center justify-between text-[11px] font-mono text-ink-muted shrink-0">
+          {/* 2. Theme Tab Interactive Click-to-Copy Swatch Widget */}
+          {activeTab === 'theme' && memoryCapsule?.themeProfile && (
+            <div className="px-6 py-2.5 bg-elevated/40 border-b border-line flex flex-wrap items-center justify-between gap-2 shrink-0">
               <div className="flex items-center gap-2">
-                <span>Pkg Manager: <strong className="text-ink">{memoryCapsule.workingRules.packageManager}</strong></span>
-                <span>·</span>
-                <span>Injected into SAMS prompt context for all tasks</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-muted">Styling DNA:</span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-canvas border border-line text-blue font-bold">
+                  {memoryCapsule.themeProfile.stylingEngine}
+                </span>
+                {memoryCapsule.themeProfile.fonts?.sans && (
+                  <span className="hidden lg:inline text-[10px] font-mono text-ink-muted">
+                    sans: <strong className="text-ink">{memoryCapsule.themeProfile.fonts.sans.split(',')[0]}</strong>
+                  </span>
+                )}
               </div>
+
+              {memoryCapsule.themeProfile.colorTokens && memoryCapsule.themeProfile.colorTokens.length > 0 && (
+                <div className="flex items-center gap-1.5 overflow-x-auto max-w-xl py-0.5">
+                  <span className="text-[10px] font-mono text-ink-subtle shrink-0">Click swatch to copy:</span>
+                  {memoryCapsule.themeProfile.colorTokens.slice(0, 8).map((tok, i) => {
+                    const isSwatchCopied = copiedSwatch === tok.name;
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => handleCopySwatch(tok.name, tok.value)}
+                        className="flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-line/80 bg-canvas hover:border-blue text-[10px] font-mono text-ink shrink-0 cursor-pointer transition-colors"
+                        title={`Click to copy ${tok.name}: ${tok.value}`}
+                      >
+                        <span
+                          className="w-2.5 h-2.5 rounded-full border border-black/20 shrink-0"
+                          style={{ backgroundColor: tok.value }}
+                        />
+                        <span className="truncate max-w-[85px]">
+                          {isSwatchCopied ? '✓ Copied!' : tok.name}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 3. Working Rules Tab Quick-Rule Adder Widget */}
+          {activeTab === 'rules' && (
+            <div className="px-6 py-2 bg-elevated/40 border-b border-line flex flex-wrap items-center justify-between gap-3 text-[11px] font-mono text-ink-muted shrink-0">
+              <div className="flex items-center gap-2">
+                <span>
+                  Pkg Manager:{' '}
+                  <strong className="text-ink">
+                    {memoryCapsule?.workingRules?.packageManager || 'bun'}
+                  </strong>
+                </span>
+                <span>·</span>
+                <span className="text-emerald-600 dark:text-emerald-400">
+                  Auto-injected into SAMS Agent prompts
+                </span>
+              </div>
+
+              <form onSubmit={handleQuickAddRule} className="flex items-center gap-1.5 flex-1 max-w-sm">
+                <input
+                  type="text"
+                  value={quickRuleInput}
+                  onChange={(e) => setQuickRuleInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229)) {
+                      e.preventDefault();
+                    }
+                  }}
+                  placeholder="+ Quick-append working rule (Enter)..."
+                  aria-label="Quick append working rule"
+                  className="flex-1 rounded-lg border border-line bg-canvas px-2.5 py-1 text-[11px] text-ink placeholder:text-ink-subtle focus:border-blue focus:outline-none"
+                />
+                <button
+                  type="submit"
+                  className="px-2.5 py-1 rounded-lg bg-blue/10 text-blue border border-blue/20 hover:bg-blue hover:text-white text-[10px] font-semibold transition-colors cursor-pointer shrink-0"
+                >
+                  + Append
+                </button>
+              </form>
             </div>
           )}
 
@@ -552,7 +726,7 @@ export const ProjectMemoryDrawer: React.FC<ProjectMemoryDrawerProps> = ({
                 {(viewMode === 'split' || viewMode === 'write') && (
                   <div className={`h-full flex flex-col min-h-0 ${viewMode === 'write' ? 'col-span-2' : ''}`}>
                     <div className="px-4 py-2 bg-canvas/70 border-b border-line/60 flex items-center justify-between text-[10px] font-mono text-ink-muted shrink-0">
-                      <span>MARKDOWN EDITOR</span>
+                      <span>MARKDOWN EDITOR ({currentTabConfig.fileName})</span>
                       <span>{docContents[activeTab].length} chars</span>
                     </div>
                     <textarea
@@ -568,7 +742,7 @@ export const ProjectMemoryDrawer: React.FC<ProjectMemoryDrawerProps> = ({
                 {(viewMode === 'split' || viewMode === 'preview') && (
                   <div className={`h-full flex flex-col min-h-0 bg-surface ${viewMode === 'preview' ? 'col-span-2' : ''}`}>
                     <div className="px-4 py-2 bg-elevated/60 border-b border-line/60 flex items-center justify-between text-[10px] font-mono text-ink-muted shrink-0">
-                      <span>LIVE PREVIEW</span>
+                      <span>OBSIDIAN LIVE PREVIEW</span>
                       <span className="capitalize">{activeTab} doc</span>
                     </div>
                     <div className="flex-1 p-6 overflow-y-auto overscroll-contain">
