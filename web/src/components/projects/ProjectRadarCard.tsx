@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Project, ProjectStatus, ProjectTask } from '../../types/sams';
+import { parseGitHubRepo, fetchGitHubRepoPulse, GitHubPulseResult } from '../../utils/githubSync';
 
 interface ProjectRadarCardProps {
   project: Project;
@@ -8,6 +9,7 @@ interface ProjectRadarCardProps {
   onUpdateFocus: (projectId: string, focus: string) => void;
   onSyncPulse: (project: Project) => void;
   onUnlinkProject: (projectId: string) => void;
+  onUpdateProject?: (projectId: string, updates: Partial<Project>) => void;
 }
 
 export const ProjectRadarCard: React.FC<ProjectRadarCardProps> = ({
@@ -17,16 +19,34 @@ export const ProjectRadarCard: React.FC<ProjectRadarCardProps> = ({
   onUpdateFocus,
   onSyncPulse,
   onUnlinkProject,
+  onUpdateProject,
 }) => {
   const [isEditingFocus, setIsEditingFocus] = useState(false);
   const [focusInput, setFocusInput] = useState(project.currentFocus || '');
   const [newTaskInput, setNewTaskInput] = useState('');
   const [isAddingTask, setIsAddingTask] = useState(false);
 
+  // GitHub Sync State
+  const [isSyncingGitHub, setIsSyncingGitHub] = useState(false);
+  const [gitHubSyncMsg, setGitHubSyncMsg] = useState<string | null>(null);
+  const [isEditingGitHubRepo, setIsEditingGitHubRepo] = useState(false);
+  const [gitHubInput, setGitHubInput] = useState(
+    project.githubRepo ||
+      (project.git?.remoteUrl ? parseGitHubRepo(project.git.remoteUrl)?.owner + '/' + parseGitHubRepo(project.git.remoteUrl)?.repo : '')
+  );
+
   const isClean = (project.git?.uncommittedChanges ?? 0) === 0;
   const tasks = project.tasks || [];
   const openTasks = tasks.filter((t) => t.status !== 'done');
   const doneTasks = tasks.filter((t) => t.status === 'done');
+
+  // Resolved GitHub Repo info
+  const resolvedRepo =
+    project.githubRepo
+      ? parseGitHubRepo(project.githubRepo)
+      : project.git?.remoteUrl
+        ? parseGitHubRepo(project.git.remoteUrl)
+        : null;
 
   const handleSaveFocus = (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,6 +61,57 @@ export const ProjectRadarCard: React.FC<ProjectRadarCardProps> = ({
     onAddTask(project.id, newTaskInput.trim());
     setNewTaskInput('');
     setIsAddingTask(false);
+  };
+
+  // Direct GitHub API Sync (100% Serverless)
+  const handleGitHubPulse = async () => {
+    const target = resolvedRepo || parseGitHubRepo(gitHubInput);
+    if (!target) {
+      setIsEditingGitHubRepo(true);
+      return;
+    }
+
+    setIsSyncingGitHub(true);
+    setGitHubSyncMsg(null);
+
+    try {
+      const pulse: GitHubPulseResult = await fetchGitHubRepoPulse(target.owner, target.repo);
+
+      if (onUpdateProject) {
+        onUpdateProject(project.id, {
+          githubRepo: `${target.owner}/${target.repo}`,
+          git: {
+            isGitRepo: true,
+            branch: pulse.defaultBranch,
+            uncommittedChanges: 0,
+            lastCommitHash: pulse.lastCommitHash,
+            lastCommitMessage: pulse.lastCommitMessage,
+            lastCommitDate: pulse.lastCommitDate,
+            remoteUrl: `https://github.com/${target.owner}/${target.repo}.git`,
+          },
+        });
+      }
+
+      setGitHubSyncMsg(`Synced commit ${pulse.lastCommitHash} from GitHub!`);
+      setTimeout(() => setGitHubSyncMsg(null), 4000);
+    } catch (err: any) {
+      setGitHubSyncMsg(`GitHub error: ${err.message}`);
+    } finally {
+      setIsSyncingGitHub(false);
+    }
+  };
+
+  const handleSaveGitHubRepo = (e: React.FormEvent) => {
+    e.preventDefault();
+    const parsed = parseGitHubRepo(gitHubInput);
+    if (parsed && onUpdateProject) {
+      const slug = `${parsed.owner}/${parsed.repo}`;
+      onUpdateProject(project.id, {
+        githubRepo: slug,
+      });
+      setIsEditingGitHubRepo(false);
+      handleGitHubPulse();
+    }
   };
 
   const getStatusBadge = (status: ProjectStatus) => {
@@ -90,6 +161,23 @@ export const ProjectRadarCard: React.FC<ProjectRadarCardProps> = ({
 
         {/* Sync Pulse & Unlink Buttons */}
         <div className="flex items-center gap-1.5 shrink-0">
+          {resolvedRepo && (
+            <button
+              type="button"
+              disabled={isSyncingGitHub}
+              onClick={handleGitHubPulse}
+              className="px-2.5 py-1 rounded-lg border border-line bg-elevated hover:bg-surface hover:border-blue/50 text-[11px] font-semibold text-ink-muted hover:text-blue transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50"
+              title="Sync latest commits directly from GitHub API"
+            >
+              {isSyncingGitHub ? (
+                <span className="animate-spin text-xs">⟳</span>
+              ) : (
+                <span className="text-blue font-bold">☁</span>
+              )}
+              <span className="hidden sm:inline">GitHub Sync</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => onSyncPulse(project)}
@@ -98,6 +186,7 @@ export const ProjectRadarCard: React.FC<ProjectRadarCardProps> = ({
           >
             <span className="text-blue font-bold">⚡</span> Pulse
           </button>
+
           <button
             type="button"
             onClick={() => {
@@ -112,6 +201,20 @@ export const ProjectRadarCard: React.FC<ProjectRadarCardProps> = ({
           </button>
         </div>
       </div>
+
+      {/* GitHub Sync Status Notification */}
+      {gitHubSyncMsg && (
+        <div className="text-[11px] font-mono px-3 py-1.5 rounded-lg bg-blue/10 border border-blue/20 text-blue flex items-center justify-between">
+          <span>{gitHubSyncMsg}</span>
+          <button
+            type="button"
+            onClick={() => setGitHubSyncMsg(null)}
+            className="text-xs text-blue hover:opacity-75 cursor-pointer ml-2"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* 2. What We're Doing (Active Objective) */}
       <div className="rounded-xl bg-elevated/70 border border-line/70 p-3.5 space-y-1.5">
@@ -172,19 +275,60 @@ export const ProjectRadarCard: React.FC<ProjectRadarCardProps> = ({
             <span className={`w-2 h-2 rounded-full ${isClean ? 'bg-emerald-500' : 'bg-amber-500'}`} />
             <span className="text-ink">git: <strong>{project.git?.branch || 'main'}</strong></span>
           </div>
-          <span
-            className={`text-[11px] font-semibold ${
-              isClean ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
-            }`}
-          >
-            {isClean ? '✓ Clean Tree' : `▲ ${project.git?.uncommittedChanges} uncommitted changes`}
-          </span>
+
+          {/* GitHub Repo Link / Connect Pill */}
+          {resolvedRepo ? (
+            <a
+              href={`https://github.com/${resolvedRepo.owner}/${resolvedRepo.repo}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[11px] text-blue hover:underline flex items-center gap-1 shrink-0"
+              title="Open repository on GitHub"
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+              </svg>
+              <span>{resolvedRepo.owner}/{resolvedRepo.repo}</span>
+            </a>
+          ) : isEditingGitHubRepo ? (
+            <form onSubmit={handleSaveGitHubRepo} className="flex items-center gap-1">
+              <input
+                type="text"
+                autoFocus
+                placeholder="owner/repo"
+                value={gitHubInput}
+                onChange={(e) => setGitHubInput(e.target.value)}
+                className="w-28 px-1.5 py-0.5 text-[10px] rounded border border-line bg-surface text-ink"
+              />
+              <button
+                type="submit"
+                className="px-1.5 py-0.5 rounded bg-blue text-white text-[10px] font-bold"
+              >
+                ✓
+              </button>
+            </form>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setIsEditingGitHubRepo(true)}
+              className="text-[10px] text-ink-muted hover:text-blue flex items-center gap-1 cursor-pointer"
+            >
+              <span>+ Link GitHub</span>
+            </button>
+          )}
         </div>
 
-        {project.git?.lastCommitMessage && (
-          <div className="text-[11px] text-ink-muted truncate border-t border-line/60 pt-1.5">
-            <span className="text-ink font-semibold">{project.git.lastCommitHash}</span> ·{' '}
-            <span className="text-ink">{project.git.lastCommitMessage}</span>
+        {/* Commit Hash and Message */}
+        {project.git?.lastCommitMessage ? (
+          <div className="text-[11px] text-ink-muted truncate border-t border-line/60 pt-1.5 flex items-center gap-1.5">
+            <span className="text-emerald-500 font-bold">✓</span>
+            <span className="text-ink font-semibold">{project.git.lastCommitHash}</span>
+            <span>·</span>
+            <span className="text-ink truncate">{project.git.lastCommitMessage}</span>
+          </div>
+        ) : (
+          <div className="text-[11px] text-ink-muted border-t border-line/60 pt-1.5">
+            No commits recorded yet. Click "☁ GitHub Sync" or "⚡ Pulse" to fetch.
           </div>
         )}
       </div>

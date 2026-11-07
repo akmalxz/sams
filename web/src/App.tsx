@@ -32,6 +32,7 @@ export function App() {
       id: 'personal-ai-platform',
       name: 'Personal AI Platform',
       workspacePath: '~/Projects/personal_ai',
+      githubRepo: 'akmalxz/sams',
       description: 'SAMS Multi-Project Command Centre & 3D Spatial Agent',
       status: 'on_track',
       currentFocus: 'Rebuild simple Project Radar & deploy interactive 3D Bot to GitHub Pages',
@@ -42,8 +43,9 @@ export function App() {
         isGitRepo: true,
         branch: 'main',
         uncommittedChanges: 0,
-        lastCommitHash: 'ea2daf3',
-        lastCommitMessage: 'feat(sams): rebuild simple first project radar with interactive 3D companion bot',
+        lastCommitHash: '1b510f8',
+        lastCommitMessage: 'fix(ci): enable auto-enablement on configure-pages',
+        remoteUrl: 'https://github.com/akmalxz/sams.git',
       },
       tasks: [
         {
@@ -68,7 +70,16 @@ export function App() {
           id: 't-3',
           projectId: 'personal-ai-platform',
           title: 'Publish to GitHub Pages via automated Actions workflow',
-          status: 'backlog',
+          status: 'done',
+          priority: 'high',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        },
+        {
+          id: 't-4',
+          projectId: 'personal-ai-platform',
+          title: 'Serverless GitHub API direct pulse synchronization',
+          status: 'in_progress',
           priority: 'high',
           createdAt: Date.now(),
           updatedAt: Date.now(),
@@ -79,6 +90,7 @@ export function App() {
       id: 'ewallet-app',
       name: 'EWallet App',
       workspacePath: '~/Projects/eWallet_App',
+      githubRepo: 'akmalxz/eWallet-App',
       description: 'Financial portfolio and modern expense analytics',
       status: 'on_track',
       currentFocus: 'Modernizing analytics overview tab with responsive category charts',
@@ -91,10 +103,11 @@ export function App() {
         uncommittedChanges: 0,
         lastCommitHash: '160ee10',
         lastCommitMessage: 'improve the analytics in the categories tab',
+        remoteUrl: 'https://github.com/akmalxz/eWallet-App.git',
       },
       tasks: [
         {
-          id: 't-4',
+          id: 't-5',
           projectId: 'ewallet-app',
           title: 'Improve analytics in categories tab',
           status: 'done',
@@ -103,7 +116,7 @@ export function App() {
           updatedAt: Date.now(),
         },
         {
-          id: 't-5',
+          id: 't-6',
           projectId: 'ewallet-app',
           title: 'Add interactive budget drilldown widgets',
           status: 'backlog',
@@ -259,6 +272,35 @@ export function App() {
         await fetch(`/api/projects/${projectId}`, { method: 'DELETE' });
       } catch (err) {
         console.error('Failed to unlink project on backend:', err);
+      }
+    }
+  };
+
+  const handleUpdateProject = async (projectId: string, updates: Partial<Project>) => {
+    setProjects((prev) => {
+      const next = prev.map((p) => {
+        if (p.id !== projectId) return p;
+        return {
+          ...p,
+          ...updates,
+          git: updates.git ? { ...p.git, ...updates.git } : p.git,
+        };
+      });
+      try {
+        localStorage.setItem('sams-projects', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    if (backendOnline) {
+      try {
+        await fetch(`/api/projects/${projectId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updates),
+        });
+      } catch (err) {
+        console.error('Failed to update project on backend:', err);
       }
     }
   };
@@ -471,6 +513,7 @@ export function App() {
                   onUpdateFocus={handleUpdateFocus}
                   onSyncPulse={(p) => setReanalyzingProject(p)}
                   onUnlinkProject={handleUnlinkProject}
+                  onUpdateProject={handleUpdateProject}
                 />
               ))}
             </div>

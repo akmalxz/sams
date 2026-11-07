@@ -88,6 +88,7 @@ export interface Project {
   id: string;
   name: string;
   workspacePath: string;
+  githubRepo?: string;
   description?: string;
   status: ProjectStatus;
   currentFocus?: string;
