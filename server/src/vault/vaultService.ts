@@ -11,9 +11,9 @@ export class VaultService {
   private watcher: FSWatcher | null = null;
   private isInitialized = false;
 
-  constructor() {
+  constructor(dbPath: string = DB_PATH) {
     ensureDirectories();
-    this.db = new Database(DB_PATH, { create: true });
+    this.db = new Database(dbPath, { create: true });
     this.setupDatabase();
   }
 
@@ -92,14 +92,20 @@ export class VaultService {
     scanDirectory(VAULT_DIR);
   }
 
-  public indexFile(fullPath: string): void {
+  public indexFile(fullPath: string, customRelativePath?: string): void {
     try {
       if (!fs.existsSync(fullPath)) {
-        this.removeFile(fullPath);
+        this.removeFile(fullPath, customRelativePath);
         return;
       }
 
-      const relativePath = path.relative(VAULT_DIR, fullPath);
+      const relativePath = customRelativePath || (
+        fullPath.startsWith(VAULT_DIR)
+          ? path.relative(VAULT_DIR, fullPath)
+          : fullPath.includes('_Projects')
+            ? fullPath.slice(fullPath.indexOf('_Projects'))
+            : path.relative(VAULT_DIR, fullPath)
+      );
       const rawContent = fs.readFileSync(fullPath, 'utf-8');
       const parsed = matter(rawContent);
 
@@ -179,8 +185,14 @@ export class VaultService {
     }
   }
 
-  public removeFile(fullPath: string): void {
-    const relativePath = path.relative(VAULT_DIR, fullPath);
+  public removeFile(fullPath: string, customRelativePath?: string): void {
+    const relativePath = customRelativePath || (
+      fullPath.startsWith(VAULT_DIR)
+        ? path.relative(VAULT_DIR, fullPath)
+        : fullPath.includes('_Projects')
+          ? fullPath.slice(fullPath.indexOf('_Projects'))
+          : path.relative(VAULT_DIR, fullPath)
+    );
     this.db.run('DELETE FROM notes WHERE path = ?', [relativePath]);
     this.db.run('DELETE FROM notes_fts WHERE path = ?', [relativePath]);
     this.db.run('DELETE FROM wikilinks WHERE source_path = ?', [relativePath]);

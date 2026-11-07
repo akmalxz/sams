@@ -12,16 +12,30 @@ import {
   ProjectGitStatus,
   AntigravitySessionSummary,
   PersonaName,
+  ProjectMemoryDocType,
+  MemorySyncState,
+  ProjectMemoryCapsule,
+  ProjectMemoryDocs,
+  ProjectThemeProfile,
+  ProjectWorkingRules,
+  ProjectArchitectureMap,
 } from '../types';
+import { VaultService } from '../vault/vaultService';
+import { ProjectVaultStore } from './projectVaultStore';
+import { ProjectAnalyzer } from './projectAnalyzer';
 
 export class ProjectService {
   private db: Database;
   private isInitialized = false;
+  public vaultStore: ProjectVaultStore;
+  private vaultService: VaultService;
 
-  constructor() {
+  constructor(vaultStore?: ProjectVaultStore, vaultService?: VaultService, dbPath: string = DB_PATH) {
     ensureDirectories();
-    this.db = new Database(DB_PATH, { create: true });
+    this.db = new Database(dbPath, { create: true });
     this.setupDatabase();
+    this.vaultService = vaultService || new VaultService();
+    this.vaultStore = vaultStore || new ProjectVaultStore(this.vaultService);
   }
 
   private setupDatabase(): void {
@@ -79,6 +93,40 @@ export class ProjectService {
       } catch (err) {
         console.warn('[ProjectService] Failed to seed default project:', err);
       }
+    }
+
+    // Auto-backfill 4-file memory capsule for any already-linked projects if missing in vault
+    try {
+      const allProjects = this.getProjects();
+      for (const p of allProjects) {
+        if (!fs.existsSync(p.workspacePath)) continue;
+        const existingDocs = await this.vaultStore.readCapsule(p.id);
+        const isMissingCapsule =
+          !existingDocs ||
+          !existingDocs.overviewMd ||
+          !existingDocs.themeMd ||
+          !existingDocs.rulesMd ||
+          !existingDocs.pulseMd;
+
+        if (isMissingCapsule) {
+          try {
+            const capsule = await ProjectAnalyzer.extractMemoryCapsule(p.workspacePath, p.id, {
+              name: p.name,
+              description: p.description,
+              tasks: p.tasks || [],
+              status: p.status,
+              currentFocus: p.currentFocus,
+              progressPercent: p.progressPercent,
+            });
+            // writeCapsule with overwriteStaticDocs = false ensures existing 00, 01, 02 are preserved
+            await this.vaultStore.writeCapsule(p.id, capsule, false);
+          } catch (capsuleErr) {
+            console.warn(`[ProjectService] Could not backfill capsule for ${p.id}:`, capsuleErr);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[ProjectService] Error during memory capsule backfill check:', err);
     }
   }
 
@@ -253,64 +301,67 @@ export class ProjectService {
     }
   }
 
-  // --- Vault Note Sync ---
-  private syncVaultProjectNote(project: Project, tasks: ProjectTask[]): void {
-    if (!isSSDMounted()) return;
-
+  // --- Vault Note Pulse Sync ---
+  public async syncVaultPulse(project: Project, tasks: ProjectTask[]): Promise<void> {
     try {
-      const projectsDir = path.join(VAULT_DIR, '_Projects');
-      if (!fs.existsSync(projectsDir)) {
-        fs.mkdirSync(projectsDir, { recursive: true });
-      }
+      const git = project.git || this.inspectGitStatus(project.workspacePath);
+      const docs = ProjectAnalyzer.generateMemoryDocs({
+        projectId: project.id,
+        projectName: project.name,
+        workspacePath: project.workspacePath,
+        status: project.status,
+        currentFocus: project.currentFocus || 'Initial project planning & setup',
+        progressPercent: project.progressPercent,
+        techStack: [],
+        theme: {
+          stylingEngine: 'unknown',
+          colorTokens: [],
+          palette: { hexColors: [], rgbColors: [], oklchColors: [], hasLightDark: false },
+          fonts: { googleFonts: [] },
+          themeMode: 'auto',
+          detectedThemeAttrs: [],
+        },
+        rules: {
+          packageManager: 'unknown',
+          scripts: {},
+          agentInstructions: [],
+          antigravityPreferences: [],
+          architecturalConstraints: [],
+        },
+        arch: {
+          directories: [],
+          entryPoints: [],
+          ciWorkflows: [],
+          safeEnvKeys: [],
+        },
+        tasks,
+        git,
+        latestAccomplishments: [],
+        healthIssues: [],
+      });
 
-      const filePath = path.join(projectsDir, `${project.id}.md`);
-      const tasksMarkdown = tasks.length > 0
-        ? tasks.map((t) => `- [${t.status === 'done' ? 'x' : ' '}] **[${t.status.toUpperCase()}]** ${t.title} *(Priority: ${t.priority})*`).join('\n')
-        : '_No tasks defined yet._';
-
-      const markdown = `---
-id: ${project.id}
-title: "${project.name}"
-workspace: "${project.workspacePath}"
-status: ${project.status}
-progress: ${project.progressPercent}%
-updated: "${new Date().toISOString()}"
-tags:
-  - project
-  - sams
----
-
-# ${project.name}
-
-> Workspace: \`${project.workspacePath}\`
-
-## What We Are Doing
-${project.currentFocus || '_No current focus defined._'}
-
-## How We Are Doing
-- **Status:** \`${project.status.toUpperCase()}\`
-- **Progress:** ${project.progressPercent}%
-- **Git Branch:** \`${project.git?.branch || 'N/A'}\`
-- **Uncommitted Changes:** ${project.git?.uncommittedChanges ?? 0} files
-- **Last Commit:** ${project.git?.lastCommitMessage || 'N/A'} (\`${project.git?.lastCommitHash || 'none'}\`)
-
-## Action Items & Deliverables
-${tasksMarkdown}
-`;
-
-      fs.writeFileSync(filePath, markdown, 'utf-8');
+      await this.vaultStore.syncPulseOnly(project.id, docs.pulseMd);
     } catch (err) {
-      console.warn(`[ProjectService] Could not write vault note for ${project.id}:`, err);
+      console.warn(`[ProjectService] Failed to sync pulse for ${project.id}:`, err);
     }
+  }
+
+  private syncVaultProjectNote(project: Project, tasks: ProjectTask[]): void {
+    // Forwards to syncVaultPulse to ensure only 03_Tasks_and_Pulse.md is modified
+    this.syncVaultPulse(project, tasks).catch((err) => {
+      console.warn(`[ProjectService] syncVaultPulse failed for ${project.id}:`, err);
+    });
   }
 
   // --- Projects Querying ---
   public getProjects(): Project[] {
     const rows = this.db.query('SELECT * FROM projects ORDER BY updated_at DESC').all() as any[];
     return rows.map((row) => {
+      const tasks = this.getTasks(row.id);
       const taskCounts = this.getTaskCounts(row.id);
       const git = this.inspectGitStatus(row.workspace_path);
       const antigravity = this.inspectAntigravityBrain(row.workspace_path);
+      const vaultStatus = this.vaultStore.getSyncState(row.id);
 
       return {
         id: row.id,
@@ -325,7 +376,9 @@ ${tasksMarkdown}
         updatedAt: row.updated_at,
         git,
         antigravity: antigravity || undefined,
+        tasks,
         taskCounts,
+        vaultStatus,
       };
     });
   }
@@ -338,6 +391,7 @@ ${tasksMarkdown}
     const taskCounts = this.getTaskCounts(id);
     const git = this.inspectGitStatus(row.workspace_path);
     const antigravity = this.inspectAntigravityBrain(row.workspace_path);
+    const vaultStatus = this.vaultStore.getSyncState(id);
 
     return {
       id: row.id,
@@ -354,6 +408,7 @@ ${tasksMarkdown}
       antigravity: antigravity || undefined,
       tasks,
       taskCounts,
+      vaultStatus,
     };
   }
 
@@ -441,8 +496,23 @@ ${tasksMarkdown}
     }
 
     const project = this.getProject(id)!;
-    this.syncVaultProjectNote(project, project.tasks || []);
-    return project;
+
+    // Generate 4-file memory capsule and persist to vault store
+    try {
+      const capsule = await ProjectAnalyzer.extractMemoryCapsule(absPath, project.id, {
+        name: project.name,
+        description: project.description,
+        tasks: project.tasks || [],
+        status: project.status,
+        currentFocus: project.currentFocus,
+        progressPercent: project.progressPercent,
+      });
+      await this.vaultStore.writeCapsule(project.id, capsule, false);
+    } catch (err) {
+      console.warn(`[ProjectService] Could not write initial memory capsule for ${project.id}:`, err);
+    }
+
+    return this.getProject(id)!;
   }
 
   // --- Update Project Metadata ---
@@ -471,11 +541,13 @@ ${tasksMarkdown}
     this.db.run(
       `UPDATE projects SET name = ?, description = ?, status = ?, current_focus = ?, progress_percent = ?, color = ?, updated_at = ?
        WHERE id = ?`,
-      [name, description, status, currentFocus, progressPercent, color, now, id]
+      [name, description ?? null, status, currentFocus ?? null, progressPercent, color ?? null, now, id]
     );
 
     const updated = this.getProject(id)!;
-    this.syncVaultProjectNote(updated, updated.tasks || []);
+    this.syncVaultPulse(updated, updated.tasks || []).catch((err) => {
+      console.warn(`[ProjectService] syncVaultPulse failed on updateProject for ${id}:`, err);
+    });
     return updated;
   }
 
@@ -510,7 +582,9 @@ ${tasksMarkdown}
     }
 
     const updated = this.getProject(id)!;
-    this.syncVaultProjectNote(updated, updated.tasks || []);
+    this.syncVaultPulse(updated, updated.tasks || []).catch((err) => {
+      console.warn(`[ProjectService] syncVaultPulse failed on syncProject for ${id}:`, err);
+    });
     return updated;
   }
 
@@ -641,6 +715,12 @@ ${tasksMarkdown}
     const tasks = this.getTasks(projectId);
     if (tasks.length === 0) {
       this.db.run('UPDATE projects SET progress_percent = 0 WHERE id = ?', [projectId]);
+      const project = this.getProject(projectId);
+      if (project) {
+        this.syncVaultPulse(project, []).catch((err) => {
+          console.warn(`[ProjectService] syncVaultPulse failed on progress recalculate for ${projectId}:`, err);
+        });
+      }
       return;
     }
     const doneCount = tasks.filter((t) => t.status === 'done').length;
@@ -649,8 +729,144 @@ ${tasksMarkdown}
 
     const project = this.getProject(projectId);
     if (project) {
-      this.syncVaultProjectNote(project, tasks);
+      this.syncVaultPulse(project, tasks).catch((err) => {
+        console.warn(`[ProjectService] syncVaultPulse failed on progress recalculate for ${projectId}:`, err);
+      });
     }
+  }
+
+  // --- Memory Capsule Helper Methods ---
+
+  public async getProjectMemory(projectId: string): Promise<ProjectMemoryCapsule | null> {
+    const project = this.getProject(projectId);
+    if (!project) return null;
+
+    let docs = await this.vaultStore.readCapsule(projectId);
+
+    // If docs missing from vault, generate and write them if workspace exists
+    if (!docs) {
+      if (fs.existsSync(project.workspacePath)) {
+        const capsule = await ProjectAnalyzer.extractMemoryCapsule(project.workspacePath, projectId, {
+          name: project.name,
+          description: project.description,
+          tasks: project.tasks || [],
+          status: project.status,
+          currentFocus: project.currentFocus,
+          progressPercent: project.progressPercent,
+        });
+        await this.vaultStore.writeCapsule(projectId, capsule, false);
+        docs = capsule.docs;
+      } else {
+        return null;
+      }
+    }
+
+    let themeProfile: ProjectThemeProfile = {
+      stylingEngine: 'unknown',
+      colorTokens: [],
+      palette: { hexColors: [], rgbColors: [], oklchColors: [], hasLightDark: false },
+      fonts: { googleFonts: [] },
+      themeMode: 'auto',
+      detectedThemeAttrs: [],
+    };
+    let workingRules: ProjectWorkingRules = {
+      packageManager: 'unknown',
+      scripts: {},
+      agentInstructions: [],
+      antigravityPreferences: [],
+      architecturalConstraints: [],
+    };
+    let architectureMap: ProjectArchitectureMap = {
+      directories: [],
+      entryPoints: [],
+      ciWorkflows: [],
+      safeEnvKeys: [],
+    };
+
+    if (fs.existsSync(project.workspacePath)) {
+      try {
+        themeProfile = ProjectAnalyzer.extractThemeProfile(project.workspacePath);
+        workingRules = ProjectAnalyzer.extractWorkingRules(project.workspacePath);
+        architectureMap = ProjectAnalyzer.extractArchitectureMap(project.workspacePath);
+      } catch (err) {
+        console.warn(`[ProjectService] Could not parse metadata from workspace ${project.workspacePath}:`, err);
+      }
+    }
+
+    const syncState = this.vaultStore.getSyncState(projectId);
+    return {
+      projectId,
+      projectSlug: projectId,
+      themeProfile,
+      workingRules,
+      architectureMap,
+      docs,
+      vaultPath: docs.vaultPath || `_Projects/${projectId}`,
+      syncState,
+      generatedAt: Date.now(),
+    };
+  }
+
+  public async updateProjectMemoryDoc(
+    projectId: string,
+    docType: ProjectMemoryDocType,
+    content: string
+  ): Promise<{ success: boolean; vaultPath: string; syncState: MemorySyncState }> {
+    const project = this.getProject(projectId);
+    if (!project) {
+      throw new Error(`Project not found: ${projectId}`);
+    }
+    await this.vaultStore.writeDoc(projectId, docType, content);
+    const syncState = this.vaultStore.getSyncState(projectId);
+    return {
+      success: true,
+      vaultPath: `_Projects/${projectId}`,
+      syncState,
+    };
+  }
+
+  public async saveProjectMemoryDoc(
+    projectId: string,
+    docType: ProjectMemoryDocType,
+    content: string
+  ): Promise<{ success: boolean; vaultPath: string; syncState: MemorySyncState }> {
+    return this.updateProjectMemoryDoc(projectId, docType, content);
+  }
+
+  public async regenerateProjectMemory(projectId: string): Promise<ProjectMemoryCapsule> {
+    const project = this.getProject(projectId);
+    if (!project) {
+      throw new Error(`Project not found: ${projectId}`);
+    }
+
+    if (!fs.existsSync(project.workspacePath)) {
+      throw new Error(`Workspace path does not exist: ${project.workspacePath}`);
+    }
+
+    const capsule = await ProjectAnalyzer.extractMemoryCapsule(project.workspacePath, projectId, {
+      name: project.name,
+      description: project.description,
+      tasks: project.tasks || [],
+      status: project.status,
+      currentFocus: project.currentFocus,
+      progressPercent: project.progressPercent,
+    });
+
+    // Update 00_Overview.md and 01_Theme_and_Design.md
+    if (capsule.docs.overviewMd) {
+      await this.vaultStore.writeDoc(projectId, 'overview', capsule.docs.overviewMd);
+    }
+    if (capsule.docs.themeMd) {
+      await this.vaultStore.writeDoc(projectId, 'theme', capsule.docs.themeMd);
+    }
+
+    // Read full updated capsule (preserves customized 02_Working_Rules.md)
+    const currentDocs = await this.vaultStore.readCapsule(projectId);
+    return {
+      ...capsule,
+      docs: currentDocs || capsule.docs,
+      syncState: this.vaultStore.getSyncState(projectId),
+    };
   }
 
   // --- Native macOS Folder Picker ---

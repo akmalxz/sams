@@ -8,7 +8,7 @@ import { ProjectAnalyzer } from './projects/projectAnalyzer';
 import { SerialQueue } from './queue/serialQueue';
 import { StagingGuard } from './sync/stagingGuard';
 import { TaskRouter } from './router/taskRouter';
-import { SystemHealth } from './types';
+import { SystemHealth, ProjectMemoryDocType } from './types';
 
 const app = express();
 app.use(cors());
@@ -157,8 +157,15 @@ app.post('/api/agent/task', (req: Request, res: Response) => {
     }
   }
 
-  // Tiered Router: Classify intent, inject FTS5 context, select persona/mode
-  const routeDecision = TaskRouter.route(prompt, persona, mode, vaultService);
+  // Tiered Router: Classify intent, inject FTS5 context and Project Memory, select persona/mode
+  const routeDecision = TaskRouter.route(
+    prompt,
+    persona,
+    mode,
+    vaultService,
+    projectId,
+    projectService.vaultStore
+  );
 
   const job = serialQueue.enqueue({
     type: 'agy',
@@ -425,6 +432,69 @@ app.post('/api/projects/:id/apply-analysis', (req: Request, res: Response) => {
 
     const updated = projectService.getProject(id);
     res.json({ success: true, project: updated, importedCount });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Project Memory Capsule REST Endpoints ---
+
+app.get('/api/projects/:id/memory', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const project = projectService.getProject(id);
+  if (!project) {
+    return res.status(404).json({ error: `Project not found: ${id}` });
+  }
+
+  try {
+    const capsule = await projectService.getProjectMemory(id);
+    if (!capsule) {
+      return res.status(404).json({ error: `Memory capsule not found for: ${id}` });
+    }
+    res.json(capsule);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/projects/:id/memory/:docType', async (req: Request, res: Response) => {
+  const { id, docType } = req.params;
+  const { content } = req.body;
+
+  const validDocTypes: ProjectMemoryDocType[] = ['overview', 'theme', 'rules', 'pulse'];
+  if (!validDocTypes.includes(docType as ProjectMemoryDocType)) {
+    return res.status(400).json({
+      error: `Invalid docType "${docType}". Valid types: ${validDocTypes.join(', ')}`,
+    });
+  }
+
+  if (typeof content !== 'string') {
+    return res.status(400).json({ error: 'content is required and must be a string' });
+  }
+
+  const project = projectService.getProject(id);
+  if (!project) {
+    return res.status(404).json({ error: `Project not found: ${id}` });
+  }
+
+  try {
+    const result = await projectService.saveProjectMemoryDoc(id, docType as ProjectMemoryDocType, content);
+    res.json({ docType, ...result });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/projects/:id/memory/regenerate', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const project = projectService.getProject(id);
+  if (!project) {
+    return res.status(404).json({ error: `Project not found: ${id}` });
+  }
+
+  try {
+    const refreshedCapsule = await projectService.regenerateProjectMemory(id);
+    res.json(refreshedCapsule);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

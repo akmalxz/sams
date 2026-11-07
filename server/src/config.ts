@@ -25,6 +25,7 @@ export const PYTHON_BIN = process.env.PYTHON_BIN || path.join(DATA_ENG_DIR, '.ve
 
 export const DATA_DIR = path.resolve(__dirname, '../data');
 export const DB_PATH = path.join(DATA_DIR, 'index.sqlite');
+export const VAULT_MIRROR_DIR = path.resolve(DATA_DIR, 'vault_mirror');
 
 export function isSSDMounted(): boolean {
   try {
@@ -37,6 +38,9 @@ export function isSSDMounted(): boolean {
 export function ensureDirectories(): void {
   if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+  if (!fs.existsSync(VAULT_MIRROR_DIR)) {
+    fs.mkdirSync(VAULT_MIRROR_DIR, { recursive: true });
   }
   if (isSSDMounted()) {
     if (!fs.existsSync(STAGING_DIR)) {

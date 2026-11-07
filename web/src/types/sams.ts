@@ -144,6 +144,8 @@ export interface Project {
     review: number;
     done: number;
   };
+  vaultStatus?: MemorySyncState;
+  memoryCapsule?: ProjectMemoryCapsule;
   createdAt: number;
   updatedAt: number;
 }
@@ -175,6 +177,99 @@ export interface ProjectAnalysisResult {
   };
   antigravitySessionFound: boolean;
   antigravityGoal?: string;
+}
+
+// --- Vault Memory Capsule Types ---
+
+export type ProjectMemoryDocType = 'overview' | 'theme' | 'rules' | 'pulse';
+
+export type MemorySyncState = 'synced_ssd' | 'cached_offline' | 'browser_only';
+
+export interface ThemeColorToken {
+  name: string;
+  value: string;
+  category: 'canvas' | 'surface' | 'elevated' | 'ink' | 'brand' | 'accent' | 'line' | 'other';
+}
+
+export interface ProjectThemeProfile {
+  stylingEngine: 'tailwind-v4' | 'tailwind-v3' | 'vanilla-css' | 'css-modules' | 'styled-components' | 'unknown';
+  colorTokens: ThemeColorToken[];
+  palette: {
+    hexColors: string[];
+    rgbColors: string[];
+    oklchColors: string[];
+    hasLightDark: boolean;
+  };
+  fonts: {
+    sans?: string;
+    mono?: string;
+    serif?: string;
+    googleFonts: string[];
+  };
+  themeMode: 'light' | 'dark' | 'auto' | 'system' | 'custom';
+  detectedThemeAttrs: string[];
+}
+
+export interface AgentInstructionSource {
+  sourceFile: string;
+  summary: string;
+  rules: string[];
+}
+
+export interface ProjectWorkingRules {
+  packageManager: 'bun' | 'pnpm' | 'npm' | 'yarn' | 'cargo' | 'pip' | 'poetry' | 'uv' | 'unknown';
+  scripts: Record<string, string>;
+  agentInstructions: AgentInstructionSource[];
+  antigravityPreferences: string[];
+  architecturalConstraints: string[];
+  lockfile?: string;
+}
+
+export interface DirectoryRoleInfo {
+  name: string;
+  path: string;
+  role: string;
+}
+
+export interface CiWorkflowInfo {
+  name: string;
+  path: string;
+  triggers: string[];
+  targets: string[];
+}
+
+export interface ProjectArchitectureMap {
+  directories: DirectoryRoleInfo[];
+  entryPoints: string[];
+  ciWorkflows: CiWorkflowInfo[];
+  databaseLayer?: {
+    engine: string;
+    schemaFiles: string[];
+    migrationsDir?: string;
+  };
+  safeEnvKeys: string[];
+}
+
+export interface ProjectMemoryDocs {
+  overviewMd: string;
+  themeMd: string;
+  rulesMd: string;
+  pulseMd: string;
+  vaultPath?: string;
+  syncState?: MemorySyncState;
+  lastSyncedAt?: number;
+}
+
+export interface ProjectMemoryCapsule {
+  projectId?: string;
+  projectSlug?: string;
+  themeProfile: ProjectThemeProfile;
+  workingRules: ProjectWorkingRules;
+  architectureMap: ProjectArchitectureMap;
+  docs: ProjectMemoryDocs;
+  vaultPath: string;
+  syncState: MemorySyncState;
+  generatedAt?: number;
 }
 
 

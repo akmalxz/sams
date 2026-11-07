@@ -4,4 +4,6 @@ node_modules/
 dist/
 build/
 server/data/*.sqlite*
+server/data/vault_mirror/
+.agents/
 .env

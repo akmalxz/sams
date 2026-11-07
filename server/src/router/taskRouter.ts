@@ -1,5 +1,9 @@
+import path from 'path';
+import fs from 'fs';
 import { PersonaName, TaskMode } from '../types';
 import { VaultService } from '../vault/vaultService';
+import { ProjectVaultStore } from '../projects/projectVaultStore';
+import { VAULT_DIR, VAULT_MIRROR_DIR, isSSDMounted } from '../config';
 
 export interface RouteDecision {
   routedPrompt: string;
@@ -10,14 +14,59 @@ export interface RouteDecision {
 
 export class TaskRouter {
   /**
+   * Reads a memory doc from SSD vault (if mounted) or offline mirror.
+   */
+  private static readMemoryDocSync(
+    slug: string,
+    fileName: string,
+    store?: ProjectVaultStore
+  ): string | null {
+    // Check if store has mock docs for testing
+    if ((store as any)?.mockDocs && (store as any).mockDocs[slug]) {
+      const docTypeKey = fileName.includes('Theme') ? 'theme' : fileName.includes('Rules') ? 'rules' : '';
+      if (docTypeKey && (store as any).mockDocs[slug][docTypeKey]) {
+        return (store as any).mockDocs[slug][docTypeKey];
+      }
+    }
+
+    const cleanSlug = ProjectVaultStore.sanitizeSlug(slug);
+    const relPath = path.join('_Projects', cleanSlug, fileName);
+
+    const isMounted = store ? store.isSSDMounted() : isSSDMounted();
+    const vaultDir = (store as any)?.vaultDir || VAULT_DIR;
+    const mirrorDir = (store as any)?.mirrorDir || VAULT_MIRROR_DIR;
+
+    if (isMounted) {
+      const ssdPath = path.join(vaultDir, relPath);
+      if (fs.existsSync(ssdPath)) {
+        try {
+          return fs.readFileSync(ssdPath, 'utf-8');
+        } catch {}
+      }
+    }
+
+    const mirrorPath = path.join(mirrorDir, relPath);
+    if (fs.existsSync(mirrorPath)) {
+      try {
+        return fs.readFileSync(mirrorPath, 'utf-8');
+      } catch {}
+    }
+
+    return null;
+  }
+
+  /**
    * Analyzes the user's prompt, classifies intent, injects relevant vault context
-   * via SQLite FTS5 search, and selects the optimal Antigravity subagent persona.
+   * via SQLite FTS5 search and Project Memory (Theme & Working Rules), and selects
+   * the optimal Antigravity subagent persona.
    */
   static route(
     prompt: string,
     requestedPersona?: PersonaName,
     requestedMode?: TaskMode,
-    vaultService?: VaultService
+    vaultService?: VaultService,
+    projectId?: string,
+    projectVaultStore?: ProjectVaultStore
   ): RouteDecision {
     const trimmed = prompt.trim();
     const lower = trimmed.toLowerCase();
@@ -65,8 +114,35 @@ export class TaskRouter {
       }
     }
 
-    // 3. Smart Context Retrieval via SQLite FTS5
+    // 3. Project Context Injection (Theme & Working Rules)
     const injectedNotes: string[] = [];
+    let projectContextBlock = '';
+
+    if (projectId) {
+      const cleanSlug = ProjectVaultStore.sanitizeSlug(projectId);
+      const themeMd = this.readMemoryDocSync(cleanSlug, '01_Theme_and_Design.md', projectVaultStore);
+      const rulesMd = this.readMemoryDocSync(cleanSlug, '02_Working_Rules.md', projectVaultStore);
+
+      if (themeMd) {
+        injectedNotes.push(`_Projects/${cleanSlug}/01_Theme_and_Design.md`);
+      }
+      if (rulesMd) {
+        injectedNotes.push(`_Projects/${cleanSlug}/02_Working_Rules.md`);
+      }
+
+      if (themeMd || rulesMd) {
+        projectContextBlock = '---\n';
+        if (themeMd) {
+          projectContextBlock += `[PROJECT CONTEXT: DESIGN & THEME]\n${themeMd.trim()}\n\n`;
+        }
+        if (rulesMd) {
+          projectContextBlock += `[PROJECT CONTEXT: WORKING RULES & CONSTRAINTS]\n${rulesMd.trim()}\n`;
+        }
+        projectContextBlock += '---\n\n';
+      }
+    }
+
+    // 4. Smart Context Retrieval via SQLite FTS5
     let contextHeader = '';
 
     if (vaultService) {
@@ -96,10 +172,13 @@ export class TaskRouter {
       }
     }
 
-    // 4. Construct Final Prompt with Persona Instructions & Injected Context
+    // 5. Construct Final Prompt with Persona Instructions & Injected Context
     let routedPrompt = trimmed;
     if (contextHeader) {
       routedPrompt = `${contextHeader}Task: ${trimmed}`;
+    }
+    if (projectContextBlock) {
+      routedPrompt = `${projectContextBlock}${routedPrompt}`;
     }
 
     return {
@@ -110,3 +189,4 @@ export class TaskRouter {
     };
   }
 }
+
