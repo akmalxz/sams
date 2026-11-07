@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Project } from '../../types/sams';
 import { BlackDot } from '../ui/BlackDot';
+import { IconAlertTriangle, IconCheck, IconPulse, IconSparkles } from '../ui/Icons';
 
 interface WhiteboardWorkbenchProps {
   currentProject: Project | null;
@@ -95,7 +96,7 @@ export const WhiteboardWorkbench: React.FC<WhiteboardWorkbenchProps> = ({
         <div className="p-4 rounded-xl bg-surface border border-line shadow-xs space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-blue font-bold">⚡</span>
+              <IconPulse className="w-4 h-4 text-blue" />
               <h3 className="text-xs font-semibold uppercase tracking-wider text-ink">
                 Codebase Pulse & AI Inspection
               </h3>
@@ -106,7 +107,7 @@ export const WhiteboardWorkbench: React.FC<WhiteboardWorkbenchProps> = ({
                 onClick={onOpenReanalyze}
                 className="px-3 py-1.5 rounded-lg bg-blue text-white text-xs font-semibold hover:opacity-95 transition-opacity cursor-pointer flex items-center gap-1.5 shadow-xs"
               >
-                <span>⚡</span> Run Deep Pulse Analysis
+                <IconPulse className="w-3.5 h-3.5" /> Run Deep Pulse Analysis
               </button>
             )}
           </div>
@@ -114,10 +115,20 @@ export const WhiteboardWorkbench: React.FC<WhiteboardWorkbenchProps> = ({
           <div className="rounded-lg bg-canvas p-3 border border-line space-y-2 text-xs">
             <div className="flex items-center justify-between font-mono text-ink-muted">
               <span>Branch: <strong className="text-ink">{currentProject.git?.branch || 'main'}</strong></span>
-              <span className={`font-semibold ${
+              <span className={`font-semibold flex items-center gap-1 ${
                 (currentProject.git?.uncommittedChanges ?? 0) === 0 ? 'text-emerald-500' : 'text-amber-500'
               }`}>
-                {(currentProject.git?.uncommittedChanges ?? 0) === 0 ? '✓ Clean Tree' : `▲ ${currentProject.git?.uncommittedChanges} uncommitted changes`}
+                {(currentProject.git?.uncommittedChanges ?? 0) === 0 ? (
+                  <>
+                    <IconCheck className="w-3.5 h-3.5" />
+                    Clean Tree
+                  </>
+                ) : (
+                  <>
+                    <IconAlertTriangle className="w-3.5 h-3.5" />
+                    {currentProject.git?.uncommittedChanges} uncommitted changes
+                  </>
+                )}
               </span>
             </div>
             {currentProject.git?.lastCommitMessage && (
@@ -134,7 +145,7 @@ export const WhiteboardWorkbench: React.FC<WhiteboardWorkbenchProps> = ({
         <div className="p-4 rounded-xl bg-surface border border-line shadow-xs space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-blue">✦</span>
+              <IconSparkles className="w-4 h-4 text-blue" />
               <h3 className="text-xs font-semibold uppercase tracking-wider text-ink">
                 Linked Antigravity Session
               </h3>

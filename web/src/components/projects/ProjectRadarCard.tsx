@@ -1,7 +1,17 @@
 import React, { useState } from 'react';
 import { Project, ProjectMemoryDocType, ProjectStatus, ProjectTask } from '../../types/sams';
 import { parseGitHubRepo, fetchGitHubRepoPulse, GitHubPulseResult } from '../../utils/githubSync';
-import { IconArchiveBox, IconBrain, IconCheck, IconClose, IconCloudSync, IconPulse } from '../ui/Icons';
+import {
+  IconArchiveBox,
+  IconBrain,
+  IconCheck,
+  IconClose,
+  IconCloudSync,
+  IconLandmark,
+  IconPalette,
+  IconPulse,
+  IconSettings,
+} from '../ui/Icons';
 
 interface ProjectRadarCardProps {
   project: Project;
@@ -362,23 +372,21 @@ export const ProjectRadarCard: React.FC<ProjectRadarCardProps> = ({
             </span>
           </div>
           <div className="grid grid-cols-4 gap-1">
-            {(
-              [
-                { id: 'overview', label: 'Charter', icon: '🏛️' },
-                { id: 'theme', label: 'Theme', icon: '🎨' },
-                { id: 'rules', label: 'Rules', icon: '⚙️' },
-                { id: 'pulse', label: 'Pulse', icon: '⚡' },
-              ] as const
-            ).map((doc) => (
+            {[
+              { id: 'overview' as const, label: 'Charter', Icon: IconLandmark },
+              { id: 'theme' as const, label: 'Theme', Icon: IconPalette },
+              { id: 'rules' as const, label: 'Rules', Icon: IconSettings },
+              { id: 'pulse' as const, label: 'Pulse', Icon: IconPulse },
+            ].map(({ id, label, Icon }) => (
               <button
-                key={doc.id}
+                key={id}
                 type="button"
-                onClick={() => onOpenMemory(project, doc.id)}
-                className="px-1.5 py-1 rounded-md border border-line/70 bg-canvas hover:border-purple-500/50 hover:bg-purple-500/5 text-[10px] font-mono text-ink-muted hover:text-ink transition-colors cursor-pointer flex items-center justify-center gap-1 truncate"
-                title={`Open ${doc.label} (.md) in Obsidian Vault Memory Drawer`}
+                onClick={() => onOpenMemory(project, id)}
+                className="px-1.5 py-1 rounded-md border border-line/70 bg-canvas hover:border-purple-500/50 hover:bg-purple-500/5 text-[10px] font-mono text-ink-muted hover:text-ink transition-colors cursor-pointer flex items-center justify-center gap-1.5 truncate"
+                title={`Open ${label} (.md) in Obsidian Vault Memory Drawer`}
               >
-                <span>{doc.icon}</span>
-                <span className="truncate">{doc.label}</span>
+                <Icon className="w-3 h-3 text-purple-500/80 shrink-0" />
+                <span className="truncate">{label}</span>
               </button>
             ))}
           </div>

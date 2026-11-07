@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Project, ProjectTask, ProjectTaskStatus, TaskPriority, PersonaId } from '../../types/sams';
 import { BlackDot } from '../ui/BlackDot';
+import { IconBot, IconClose } from '../ui/Icons';
 
 interface KanbanWorkbenchProps {
   currentProject: Project | null;
@@ -181,10 +182,10 @@ export const KanbanWorkbench: React.FC<KanbanWorkbenchProps> = ({
                         <button
                           type="button"
                           onClick={() => onDeleteTask(task.id)}
-                          className="text-ink-subtle hover:text-red-500 transition-colors cursor-pointer text-xs leading-none"
+                          className="text-ink-subtle hover:text-red-500 transition-colors cursor-pointer p-0.5 rounded"
                           title="Delete deliverable"
                         >
-                          ✕
+                          <IconClose className="w-3.5 h-3.5" />
                         </button>
                       </div>
 
@@ -201,8 +202,9 @@ export const KanbanWorkbench: React.FC<KanbanWorkbenchProps> = ({
                         </span>
 
                         {task.assignedAgent && (
-                          <span className="text-ink-muted capitalize">
-                            🤖 {task.assignedAgent.replace('-', ' ')}
+                          <span className="text-ink-muted capitalize flex items-center gap-1">
+                            <IconBot className="w-3 h-3 text-purple-500" />
+                            {task.assignedAgent.replace('-', ' ')}
                           </span>
                         )}
                       </div>

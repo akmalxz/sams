@@ -1,6 +1,17 @@
 import React, { useState, useEffect, useRef, useId } from 'react';
 import { Project, ProjectMemoryCapsule, ProjectMemoryDocType, MemorySyncState } from '../../types/sams';
-import { IconBrain, IconCopy, IconCheck, IconClose, IconDownload } from '../ui/Icons';
+import {
+  IconBrain,
+  IconCheck,
+  IconClose,
+  IconCopy,
+  IconDownload,
+  IconFolder,
+  IconLandmark,
+  IconPalette,
+  IconPulse,
+  IconSettings,
+} from '../ui/Icons';
 
 interface ProjectMemoryDrawerProps {
   project: Project | null;
@@ -17,12 +28,12 @@ const TAB_CONFIG: Array<{
   id: ProjectMemoryDocType;
   fileName: string;
   label: string;
-  icon: string;
+  Icon: React.FC<{ className?: string }>;
 }> = [
-  { id: 'overview', fileName: '00_Overview.md', label: 'Overview & Arch', icon: '🏛️' },
-  { id: 'theme', fileName: '01_Theme_and_Design.md', label: 'Theme & Design DNA', icon: '🎨' },
-  { id: 'rules', fileName: '02_Working_Rules.md', label: 'Working Rules & Guardrails', icon: '⚙️' },
-  { id: 'pulse', fileName: '03_Tasks_and_Pulse.md', label: 'Tasks & Live Pulse', icon: '⚡' },
+  { id: 'overview', fileName: '00_Overview.md', label: 'Overview & Arch', Icon: IconLandmark },
+  { id: 'theme', fileName: '01_Theme_and_Design.md', label: 'Theme & Design DNA', Icon: IconPalette },
+  { id: 'rules', fileName: '02_Working_Rules.md', label: 'Working Rules & Guardrails', Icon: IconSettings },
+  { id: 'pulse', fileName: '03_Tasks_and_Pulse.md', label: 'Tasks & Live Pulse', Icon: IconPulse },
 ];
 
 export const ProjectMemoryDrawer: React.FC<ProjectMemoryDrawerProps> = ({
@@ -578,6 +589,7 @@ export const ProjectMemoryDrawer: React.FC<ProjectMemoryDrawerProps> = ({
             {TAB_CONFIG.map((t) => {
               const isActive = activeTab === t.id;
               const hasDirty = hasUnsavedChanges[t.id];
+              const TabIcon = t.Icon;
               return (
                 <button
                   key={t.id}
@@ -589,7 +601,7 @@ export const ProjectMemoryDrawer: React.FC<ProjectMemoryDrawerProps> = ({
                       : 'border-transparent text-ink-muted hover:text-ink hover:border-line'
                   }`}
                 >
-                  <span>{t.icon}</span>
+                  <TabIcon className="w-3.5 h-3.5 shrink-0" />
                   <span>{t.fileName}</span>
                   {hasDirty && <span className="w-1.5 h-1.5 rounded-full bg-amber-500" title="Unsaved changes" />}
                 </button>
@@ -607,10 +619,12 @@ export const ProjectMemoryDrawer: React.FC<ProjectMemoryDrawerProps> = ({
                 {memoryCapsule.architectureMap.directories.slice(0, 5).map((dir, i) => (
                   <span
                     key={i}
-                    className="px-2 py-0.5 rounded bg-canvas border border-line text-ink"
+                    className="px-2 py-0.5 rounded bg-canvas border border-line text-ink flex items-center gap-1"
                     title={dir.role}
                   >
-                    📂 {dir.name}/ <span className="text-ink-subtle">({dir.role.split(' ')[0]})</span>
+                    <IconFolder className="w-3 h-3 text-blue shrink-0" />
+                    <span>{dir.name}/</span>
+                    <span className="text-ink-subtle">({dir.role.split(' ')[0]})</span>
                   </span>
                 ))}
               </div>
@@ -659,8 +673,15 @@ export const ProjectMemoryDrawer: React.FC<ProjectMemoryDrawerProps> = ({
                           className="w-2.5 h-2.5 rounded-full border border-black/20 shrink-0"
                           style={{ backgroundColor: tok.value }}
                         />
-                        <span className="truncate max-w-[85px]">
-                          {isSwatchCopied ? '✓ Copied!' : tok.name}
+                        <span className="truncate max-w-[85px] flex items-center gap-1">
+                          {isSwatchCopied ? (
+                            <>
+                              <IconCheck className="w-3 h-3 text-emerald-500 shrink-0" />
+                              <span className="text-emerald-500 font-semibold">Copied</span>
+                            </>
+                          ) : (
+                            tok.name
+                          )}
                         </span>
                       </button>
                     );

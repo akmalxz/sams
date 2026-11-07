@@ -3,6 +3,7 @@ import { clsx } from 'clsx';
 import { AgentBot, PersonaId, StationId, VisorState } from '../../types/sams';
 import { AgentVisor } from './AgentVisor';
 import { BlackDot } from '../ui/BlackDot';
+import { IconChevronDown, IconClose } from '../ui/Icons';
 
 interface AgentStatesDockProps {
   currentGlobalState: VisorState;
@@ -65,7 +66,9 @@ export const AgentStatesDock: React.FC<AgentStatesDockProps> = ({
               <span className="font-bold text-ink leading-tight capitalize">{effectiveState}</span>
               <span className="w-1.5 h-1.5 rounded-full bg-blue animate-pulse" />
             </div>
-            <span className="text-[10px] text-ink-muted">Visor States ▾</span>
+            <span className="text-[10px] text-ink-muted flex items-center gap-0.5">
+              Visor States <IconChevronDown className="w-3 h-3" />
+            </span>
           </div>
         </button>
       ) : (
@@ -99,9 +102,9 @@ export const AgentStatesDock: React.FC<AgentStatesDockProps> = ({
                 type="button"
                 onClick={() => setIsExpanded(false)}
                 aria-label="Collapse Agent States"
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-ink-muted hover:bg-elevated hover:text-ink transition-colors cursor-pointer text-xs"
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-ink-muted hover:bg-elevated hover:text-ink transition-colors cursor-pointer"
               >
-                ✕
+                <IconClose className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>

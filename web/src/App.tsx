@@ -28,6 +28,7 @@ import {
   IconFolderCode,
   IconKanban,
   IconSearch,
+  IconSparkles,
 } from './components/ui/Icons';
 
 export function App() {
@@ -212,7 +213,7 @@ export function App() {
     {
       id: 'area-1',
       name: 'DevOps & Cloud CI/CD',
-      icon: '🚀',
+      icon: 'rocket',
       description: 'GitHub Actions, GitHub Pages deployment, DNS, and serverless hosting.',
       standards: [
         "Always set base: './' in Vite config for GitHub Pages subpath deployment.",
@@ -224,7 +225,7 @@ export function App() {
     {
       id: 'area-2',
       name: 'Agentic AI & Antigravity',
-      icon: '🤖',
+      icon: 'bot',
       description: 'Subagent orchestration, plan milestones, and prompt engineering.',
       standards: [
         'Targeted file reads (<50ms) over deep directory traversal to protect M1 unified memory.',
@@ -236,7 +237,7 @@ export function App() {
     {
       id: 'area-3',
       name: 'Modern Frontend & 3D UI',
-      icon: '🎨',
+      icon: 'palette',
       description: 'React 18, Tailwind CSS v4, Three.js WebGL, and accessible design.',
       standards: [
         'Conserve battery and memory by pausing requestAnimationFrame on document.hidden.',
@@ -248,7 +249,7 @@ export function App() {
     {
       id: 'area-4',
       name: 'Data Architecture & Storage',
-      icon: '💾',
+      icon: 'database',
       description: 'Local-first SQLite, browser localStorage caching, and external SSD vault.',
       standards: [
         'Dual-Mode persistence: operate serverless on GitHub Pages and sync to local backend.',
@@ -1148,7 +1149,7 @@ ${(project.tasks || []).map((t) => `- [${t.status === 'done' ? 'x' : ' '}] **${t
         {/* Brand */}
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-xl bg-blue text-white flex items-center justify-center shadow-xs font-bold text-sm">
-            ✦
+            <IconSparkles className="w-4 h-4 text-white" />
           </div>
           <div>
             <div className="flex items-center gap-2">

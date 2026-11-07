@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Project } from '../../types/sams';
 import { BlackDot } from '../ui/BlackDot';
+import { IconAlertTriangle, IconCheck, IconClose } from '../ui/Icons';
 
 interface SecurityGateWorkbenchProps {
   currentProject: Project | null;
@@ -147,8 +148,8 @@ export const SecurityGateWorkbench: React.FC<SecurityGateWorkbenchProps> = ({
         <div className="space-y-2 text-xs">
           <div className="flex items-center justify-between p-2.5 rounded-lg bg-canvas border border-line">
             <div className="flex items-center gap-2">
-              <span className={isGitClean ? 'text-emerald-500 font-bold' : 'text-amber-500'}>
-                {isGitClean ? '✓' : '▲'}
+              <span className={isGitClean ? 'text-emerald-500' : 'text-amber-500'}>
+                {isGitClean ? <IconCheck className="w-4 h-4" /> : <IconAlertTriangle className="w-4 h-4" />}
               </span>
               <span className="text-ink">Git Working Tree Clean</span>
             </div>
@@ -159,8 +160,8 @@ export const SecurityGateWorkbench: React.FC<SecurityGateWorkbenchProps> = ({
 
           <div className="flex items-center justify-between p-2.5 rounded-lg bg-canvas border border-line">
             <div className="flex items-center gap-2">
-              <span className={health?.ssdMounted ? 'text-emerald-500 font-bold' : 'text-red-500'}>
-                {health?.ssdMounted ? '✓' : '✕'}
+              <span className={health?.ssdMounted ? 'text-emerald-500' : 'text-red-500'}>
+                {health?.ssdMounted ? <IconCheck className="w-4 h-4" /> : <IconClose className="w-4 h-4" />}
               </span>
               <span className="text-ink">External SSD Vault Storage</span>
             </div>
@@ -171,8 +172,8 @@ export const SecurityGateWorkbench: React.FC<SecurityGateWorkbenchProps> = ({
 
           <div className="flex items-center justify-between p-2.5 rounded-lg bg-canvas border border-line">
             <div className="flex items-center gap-2">
-              <span className={conflicts.length === 0 ? 'text-emerald-500 font-bold' : 'text-red-500 font-bold'}>
-                {conflicts.length === 0 ? '✓' : '✕'}
+              <span className={conflicts.length === 0 ? 'text-emerald-500' : 'text-red-500'}>
+                {conflicts.length === 0 ? <IconCheck className="w-4 h-4" /> : <IconClose className="w-4 h-4" />}
               </span>
               <span className="text-ink">Google Drive Sync Conflicts</span>
             </div>

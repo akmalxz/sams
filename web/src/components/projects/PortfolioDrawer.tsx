@@ -1,5 +1,6 @@
 import React from 'react';
 import { Project, ProjectStatus, ProjectTask } from '../../types/sams';
+import { IconAlertCircle, IconAlertTriangle, IconCheck, IconClose, IconPulse } from '../ui/Icons';
 
 interface PortfolioDrawerProps {
   isOpen: boolean;
@@ -27,13 +28,13 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({
   const getStatusBadge = (status: ProjectStatus) => {
     switch (status) {
       case 'on_track':
-        return <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">● On Track</span>;
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />On Track</span>;
       case 'at_risk':
-        return <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">▲ At Risk</span>;
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center gap-1"><IconAlertTriangle className="w-3 h-3 text-amber-500" />At Risk</span>;
       case 'blocked':
-        return <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">✕ Blocked</span>;
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 flex items-center gap-1"><IconAlertCircle className="w-3 h-3 text-red-500" />Blocked</span>;
       case 'completed':
-        return <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue/10 text-blue border border-blue/20">✓ Completed</span>;
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue/10 text-blue border border-blue/20 flex items-center gap-1"><IconCheck className="w-3 h-3 text-blue" />Completed</span>;
     }
   };
 
@@ -71,9 +72,9 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({
                 type="button"
                 onClick={onClose}
                 aria-label="Close"
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-muted hover:bg-elevated hover:text-ink transition-colors cursor-pointer text-sm"
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-muted hover:bg-elevated hover:text-ink transition-colors cursor-pointer"
               >
-                ✕
+                <IconClose className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -183,7 +184,8 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({
                         className="px-2.5 py-1 rounded-lg bg-elevated border border-line text-[11px] font-semibold text-ink-muted hover:text-blue hover:border-blue transition-colors cursor-pointer flex items-center gap-1.5"
                         title="Auto-analyze and refresh pulse for this codebase"
                       >
-                        <span className="text-blue font-bold">⚡</span> Re-Analyze
+                        <IconPulse className="w-3.5 h-3.5 text-blue" />
+                        <span>Re-Analyze</span>
                       </button>
                     ) : (
                       <div />

@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { IconClose } from '../ui/Icons';
 
 interface StationDrawerProps {
   isOpen: boolean;
@@ -62,9 +63,9 @@ export const StationDrawer: React.FC<StationDrawerProps> = ({
                 type="button"
                 onClick={onClose}
                 aria-label="Close drawer"
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-muted hover:bg-elevated hover:text-ink transition-colors cursor-pointer text-sm"
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-muted hover:bg-elevated hover:text-ink transition-colors cursor-pointer"
               >
-                ✕
+                <IconClose className="w-4 h-4" />
               </button>
             </div>
           </div>

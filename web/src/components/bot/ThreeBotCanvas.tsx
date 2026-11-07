@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
+import { IconClose } from '../ui/Icons';
 
 export type BotMood = 'focus' | 'clean' | 'dirty' | 'error';
 
@@ -318,9 +319,10 @@ export const ThreeBotCanvas: React.FC<ThreeBotCanvasProps> = ({
             <button
               type="button"
               onClick={() => setSpeechVisible(false)}
-              className="text-[10px] text-ink-muted hover:text-ink cursor-pointer"
+              className="text-ink-muted hover:text-ink cursor-pointer p-0.5 rounded"
+              title="Dismiss"
             >
-              ✕
+              <IconClose className="w-3 h-3" />
             </button>
           </div>
           <p className="text-xs text-ink font-medium leading-relaxed mt-1">

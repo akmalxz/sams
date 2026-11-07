@@ -1,6 +1,7 @@
 import React from 'react';
 import { Project } from '../../types/sams';
 import { BlackDot } from '../ui/BlackDot';
+import { IconChevronDown, IconPulse } from '../ui/Icons';
 
 interface ProjectCommandHeaderProps {
   currentProject: Project | null;
@@ -63,9 +64,7 @@ export const ProjectCommandHeader: React.FC<ProjectCommandHeaderProps> = ({
               {currentProject.progressPercent}%
             </span>
           )}
-          <span className="text-[10px] text-ink-subtle group-hover:text-blue transition-colors">
-            ▾
-          </span>
+          <IconChevronDown className="w-3.5 h-3.5 text-ink-subtle group-hover:text-blue transition-colors" />
         </button>
 
         {currentProject && onOpenReanalyze && (
@@ -75,7 +74,7 @@ export const ProjectCommandHeader: React.FC<ProjectCommandHeaderProps> = ({
             className="px-2.5 py-1.5 rounded-full border border-line bg-elevated/80 hover:bg-surface hover:border-blue/50 text-xs font-medium text-ink-muted hover:text-blue transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
             title="Auto-Analyze & Sync Codebase Pulse"
           >
-            <span className="text-blue font-bold">⚡</span>
+            <IconPulse className="w-3.5 h-3.5 text-blue" />
             <span className="hidden md:inline text-[11px] font-semibold">Pulse</span>
           </button>
         )}

@@ -1,12 +1,36 @@
 import React, { useState } from 'react';
 import { AreaOfResponsibility } from '../../types/sams';
-import { IconCheck, IconClose, IconCompass, IconTrash } from '../ui/Icons';
+import {
+  IconBot,
+  IconCheck,
+  IconClose,
+  IconCompass,
+  IconDatabase,
+  IconPalette,
+  IconRocket,
+  IconTrash,
+} from '../ui/Icons';
 
 interface AreasSectionProps {
   areas: AreaOfResponsibility[];
   onAddStandard: (areaId: string, standard: string) => void;
   onRemoveStandard: (areaId: string, index: number) => void;
 }
+
+const renderAreaIcon = (iconName: string) => {
+  switch (iconName) {
+    case 'rocket':
+      return <IconRocket className="w-4 h-4 text-blue" />;
+    case 'bot':
+      return <IconBot className="w-4 h-4 text-purple-500" />;
+    case 'palette':
+      return <IconPalette className="w-4 h-4 text-emerald-500" />;
+    case 'database':
+      return <IconDatabase className="w-4 h-4 text-amber-500" />;
+    default:
+      return <IconCompass className="w-4 h-4 text-purple-500" />;
+  }
+};
 
 export const AreasSection: React.FC<AreasSectionProps> = ({
   areas,
@@ -56,11 +80,16 @@ export const AreasSection: React.FC<AreasSectionProps> = ({
             className="rounded-xl border border-line bg-canvas/50 p-4 space-y-3 hover:border-purple-500/40 transition-colors"
           >
             <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2.5">
-                <span
-                  className="w-2.5 h-2.5 rounded-full shrink-0"
-                  style={{ backgroundColor: area.color }}
-                />
+              <div className="flex items-start gap-3">
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border"
+                  style={{
+                    backgroundColor: `${area.color}15`,
+                    borderColor: `${area.color}30`,
+                  }}
+                >
+                  {renderAreaIcon(area.icon)}
+                </div>
                 <div>
                   <h3 className="text-sm font-bold text-ink">{area.name}</h3>
                   <p className="text-xs text-ink-muted leading-relaxed">

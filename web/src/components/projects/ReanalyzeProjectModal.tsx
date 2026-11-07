@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Project, ProjectAnalysisResult, SuggestedDeliverable } from '../../types/sams';
+import { IconBot, IconCheck, IconClose, IconPulse, IconSparkles } from '../ui/Icons';
 
 interface ReanalyzeProjectModalProps {
   isOpen: boolean;
@@ -203,7 +204,7 @@ export const ReanalyzeProjectModal: React.FC<ReanalyzeProjectModalProps> = ({
             className="rounded-lg p-1.5 text-ink-muted hover:bg-elevated hover:text-ink transition-colors cursor-pointer"
             aria-label="Close dialog"
           >
-            ✕
+            <IconClose className="w-4 h-4" />
           </button>
         </div>
 
@@ -287,7 +288,7 @@ export const ReanalyzeProjectModal: React.FC<ReanalyzeProjectModalProps> = ({
                 <div className="space-y-1 text-xs text-ink font-mono">
                   {analysis.latestAccomplishments.map((acc, i) => (
                     <div key={i} className="flex items-start gap-1.5 truncate">
-                      <span className="text-emerald-500 font-bold">✓</span>
+                      <IconCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
                       <span className="truncate">{acc}</span>
                     </div>
                   ))}
@@ -307,7 +308,8 @@ export const ReanalyzeProjectModal: React.FC<ReanalyzeProjectModalProps> = ({
                     onClick={() => setCurrentFocus(analysis.currentFocus)}
                     className="text-[11px] text-blue hover:underline cursor-pointer flex items-center gap-1"
                   >
-                    <span>✦</span> Use AI Analyzed Focus
+                    <IconSparkles className="w-3.5 h-3.5 text-blue" />
+                    <span>Use AI Analyzed Focus</span>
                   </button>
                 )}
               </div>
@@ -372,7 +374,10 @@ export const ReanalyzeProjectModal: React.FC<ReanalyzeProjectModalProps> = ({
                         <div className="flex items-center gap-2 mt-1 text-[10px] font-mono text-ink-subtle">
                           <span className="uppercase text-amber-500 font-semibold">{item.priority}</span>
                           <span>·</span>
-                          <span className="capitalize">🤖 {item.assignedAgent || 'architect'}</span>
+                          <span className="capitalize flex items-center gap-1">
+                            <IconBot className="w-3 h-3 text-ink-subtle" />
+                            <span>{item.assignedAgent || 'architect'}</span>
+                          </span>
                           {item.category && (
                             <>
                               <span>·</span>
@@ -405,7 +410,10 @@ export const ReanalyzeProjectModal: React.FC<ReanalyzeProjectModalProps> = ({
                 {isSubmitting ? (
                   'Updating...'
                 ) : (
-                  `⚡ Apply Updates ${selectedCount > 0 ? `& Import ${selectedCount} Tasks` : ''} →`
+                  <>
+                    <IconPulse className="w-3.5 h-3.5" />
+                    <span>Apply Updates {selectedCount > 0 ? `& Import ${selectedCount} Tasks` : ''} →</span>
+                  </>
                 )}
               </button>
             </div>

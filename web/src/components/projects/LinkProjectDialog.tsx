@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Project, ProjectAnalysisResult, SuggestedDeliverable } from '../../types/sams';
+import { IconBot, IconCheck, IconClose, IconFolder } from '../ui/Icons';
 
 interface LinkProjectDialogProps {
   isOpen: boolean;
@@ -247,7 +248,7 @@ export const LinkProjectDialog: React.FC<LinkProjectDialogProps> = ({
             className="rounded-lg p-1.5 text-ink-muted hover:bg-elevated hover:text-ink transition-colors cursor-pointer"
             aria-label="Close dialog"
           >
-            ✕
+            <IconClose className="w-4 h-4" />
           </button>
         </div>
 
@@ -279,7 +280,8 @@ export const LinkProjectDialog: React.FC<LinkProjectDialogProps> = ({
                   disabled={isPicking}
                   className="rounded-lg bg-elevated border border-line px-3 py-2 text-xs font-medium text-ink hover:border-blue hover:text-blue transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50 shrink-0"
                 >
-                  {isPicking ? 'Opening...' : '📂 Choose in Finder'}
+                  <IconFolder className="w-3.5 h-3.5 text-blue" />
+                  <span>{isPicking ? 'Opening...' : 'Choose in Finder'}</span>
                 </button>
               </div>
             </div>
@@ -388,7 +390,7 @@ export const LinkProjectDialog: React.FC<LinkProjectDialogProps> = ({
                 <div className="space-y-1 text-xs text-ink font-mono">
                   {analysisResult.latestAccomplishments.map((acc, i) => (
                     <div key={i} className="flex items-start gap-1.5 truncate">
-                      <span className="text-emerald-500 font-bold">✓</span>
+                      <IconCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
                       <span className="truncate">{acc}</span>
                     </div>
                   ))}
@@ -543,7 +545,10 @@ export const LinkProjectDialog: React.FC<LinkProjectDialogProps> = ({
                         <div className="flex items-center gap-2 mt-1 text-[10px] font-mono text-ink-subtle">
                           <span className="uppercase text-amber-500 font-semibold">{item.priority}</span>
                           <span>·</span>
-                          <span className="capitalize">🤖 {item.assignedAgent || 'architect'}</span>
+                          <span className="capitalize flex items-center gap-1">
+                            <IconBot className="w-3 h-3 text-ink-subtle" />
+                            <span>{item.assignedAgent || 'architect'}</span>
+                          </span>
                           {item.category && (
                             <>
                               <span>·</span>

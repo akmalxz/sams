@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Project, ProjectStatus, ProjectTask } from '../../types/sams';
+import { IconAlertCircle, IconAlertTriangle, IconCheck } from '../ui/Icons';
 
 interface ProjectPortfolioMatrixProps {
   projects: Project[];
@@ -34,13 +35,13 @@ export const ProjectPortfolioMatrix: React.FC<ProjectPortfolioMatrixProps> = ({
   const getStatusBadge = (status: ProjectStatus) => {
     switch (status) {
       case 'on_track':
-        return <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">● On Track</span>;
+        return <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />On Track</span>;
       case 'at_risk':
-        return <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">▲ At Risk</span>;
+        return <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center gap-1"><IconAlertTriangle className="w-3 h-3 text-amber-500" />At Risk</span>;
       case 'blocked':
-        return <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">✕ Blocked</span>;
+        return <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 flex items-center gap-1"><IconAlertCircle className="w-3 h-3 text-red-500" />Blocked</span>;
       case 'completed':
-        return <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue/10 text-blue border border-blue/20">✓ Completed</span>;
+        return <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue/10 text-blue border border-blue/20 flex items-center gap-1"><IconCheck className="w-3 h-3 text-blue" />Completed</span>;
     }
   };
 
