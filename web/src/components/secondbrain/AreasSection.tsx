@@ -1,0 +1,139 @@
+import React, { useState } from 'react';
+import { AreaOfResponsibility } from '../../types/sams';
+
+interface AreasSectionProps {
+  areas: AreaOfResponsibility[];
+  onAddStandard: (areaId: string, standard: string) => void;
+  onRemoveStandard: (areaId: string, index: number) => void;
+}
+
+export const AreasSection: React.FC<AreasSectionProps> = ({
+  areas,
+  onAddStandard,
+  onRemoveStandard,
+}) => {
+  const [activeAreaId, setActiveAreaId] = useState<string | null>(null);
+  const [newStandardInput, setNewStandardInput] = useState('');
+
+  const handleAdd = (e: React.FormEvent, areaId: string) => {
+    e.preventDefault();
+    if (!newStandardInput.trim()) return;
+    onAddStandard(areaId, newStandardInput.trim());
+    setNewStandardInput('');
+    setActiveAreaId(null);
+  };
+
+  return (
+    <div className="rounded-2xl border border-line bg-surface p-5 sm:p-6 shadow-xs space-y-5">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-line">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold text-sm">
+            🌐
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-bold text-ink tracking-tight">
+                Areas of Responsibility
+              </h2>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 font-semibold border border-purple-500/20">
+                P.A.R.A. · Areas
+              </span>
+            </div>
+            <p className="text-xs text-ink-muted">
+              Ongoing domains and engineering standards that have no deadline (DevOps, Frontend, AI, Data).
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Grid of Areas */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {areas.map((area) => (
+          <div
+            key={area.id}
+            className="rounded-xl border border-line bg-canvas/60 p-4 space-y-3 hover:border-purple-500/40 transition-colors"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl">{area.icon}</span>
+                <div>
+                  <h3 className="text-sm font-bold text-ink">{area.name}</h3>
+                  <p className="text-xs text-ink-muted leading-relaxed">
+                    {area.description}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Standards Checklist */}
+            <div className="space-y-1.5 pt-1">
+              <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-ink-muted">
+                <span>Operating Standards & Checklists</span>
+                {activeAreaId !== area.id && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveAreaId(area.id)}
+                    className="text-blue hover:underline cursor-pointer"
+                  >
+                    + Add Rule
+                  </button>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                {area.standards.map((standard, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-start gap-2 text-xs text-ink p-1.5 rounded-lg bg-surface border border-line/60 group"
+                  >
+                    <span className="text-purple-500 font-bold shrink-0">✓</span>
+                    <span className="flex-1 min-w-0 font-medium leading-relaxed">
+                      {standard}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => onRemoveStandard(area.id, idx)}
+                      className="opacity-0 group-hover:opacity-100 text-[10px] text-ink-muted hover:text-red-500 cursor-pointer p-0.5 shrink-0"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {activeAreaId === area.id && (
+                <form
+                  onSubmit={(e) => handleAdd(e, area.id)}
+                  className="flex gap-1.5 pt-1.5"
+                >
+                  <input
+                    type="text"
+                    autoFocus
+                    value={newStandardInput}
+                    onChange={(e) => setNewStandardInput(e.target.value)}
+                    placeholder="New standard (e.g. Always test with 8GB RAM budget)..."
+                    className="flex-1 rounded-lg border border-line bg-surface px-2.5 py-1 text-xs text-ink placeholder:text-ink-subtle focus:border-blue focus:outline-none"
+                  />
+                  <button
+                    type="submit"
+                    className="px-2.5 py-1 rounded-lg bg-blue text-xs font-semibold text-white shadow-2xs cursor-pointer"
+                  >
+                    Add
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveAreaId(null)}
+                    className="px-2 py-1 rounded-lg bg-elevated text-xs text-ink-muted cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </form>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};

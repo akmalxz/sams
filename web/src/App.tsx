@@ -1,9 +1,20 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Project, ProjectTask, ProjectTaskStatus, LearningNote, QuickTodoItem } from './types/sams';
+import {
+  Project,
+  ProjectTask,
+  ProjectTaskStatus,
+  LearningNote,
+  QuickTodoItem,
+  AreaOfResponsibility,
+  ArchivedProject,
+} from './types/sams';
 import { ProjectRadarCard } from './components/projects/ProjectRadarCard';
 import { LearnSection } from './components/learn/LearnSection';
 import { QuickTodoSection } from './components/todo/QuickTodoSection';
 import { UnifiedKanbanBoard } from './components/kanban/UnifiedKanbanBoard';
+import { AreasSection } from './components/secondbrain/AreasSection';
+import { ArchivesSection } from './components/secondbrain/ArchivesSection';
+import { MarkdownNoteDrawer } from './components/secondbrain/MarkdownNoteDrawer';
 import { LinkProjectDialog } from './components/projects/LinkProjectDialog';
 import { ReanalyzeProjectModal } from './components/projects/ReanalyzeProjectModal';
 import { ThreeBotCanvas, BotMood } from './components/bot/ThreeBotCanvas';
@@ -29,25 +40,25 @@ export function App() {
     localStorage.setItem('sams-theme', next);
   };
 
-  // Demo initial projects when running purely statically or offline
+  // --- Initial Default Seeds for Full Second Brain ---
   const DEFAULT_DEMO_PROJECTS: Project[] = [
     {
       id: 'personal-ai-platform',
       name: 'Personal AI Platform',
       workspacePath: '~/Projects/personal_ai',
       githubRepo: 'akmalxz/sams',
-      description: 'SAMS Multi-Project Command Centre & 3D Spatial Agent',
+      description: 'SAMS Full Developer Second Brain & 3D Spatial Agent',
       status: 'on_track',
-      currentFocus: '3-tier layout: Projects | Learn | To do with Unified Cross-Project Kanban',
-      progressPercent: 75,
+      currentFocus: 'Full Second Brain System: Projects, Areas, Resources, Archives (PARA)',
+      progressPercent: 85,
       createdAt: Date.now() - 86400000,
       updatedAt: Date.now(),
       git: {
         isGitRepo: true,
         branch: 'main',
         uncommittedChanges: 0,
-        lastCommitHash: '5c8c3f8',
-        lastCommitMessage: 'feat(github): add serverless direct GitHub API commit & repo pulse sync',
+        lastCommitHash: 'b5252b6',
+        lastCommitMessage: 'feat(layout): implement Projects | Learn | To do tri-split and Unified Cross-Project Kanban Board',
         remoteUrl: 'https://github.com/akmalxz/sams.git',
       },
       tasks: [
@@ -55,7 +66,7 @@ export function App() {
           id: 't-1',
           projectId: 'personal-ai-platform',
           title: 'Split layout into Projects | Learn | To do',
-          status: 'in_progress',
+          status: 'done',
           priority: 'high',
           createdAt: Date.now(),
           updatedAt: Date.now(),
@@ -64,7 +75,7 @@ export function App() {
           id: 't-2',
           projectId: 'personal-ai-platform',
           title: 'Implement Unified Cross-Project Kanban Board',
-          status: 'in_progress',
+          status: 'done',
           priority: 'high',
           createdAt: Date.now(),
           updatedAt: Date.now(),
@@ -72,8 +83,8 @@ export function App() {
         {
           id: 't-3',
           projectId: 'personal-ai-platform',
-          title: 'Publish to GitHub Pages via automated Actions workflow',
-          status: 'done',
+          title: 'Implement Full P.A.R.A. Second Brain with Markdown Drawer & Archives',
+          status: 'in_progress',
           priority: 'high',
           createdAt: Date.now(),
           updatedAt: Date.now(),
@@ -136,6 +147,7 @@ export function App() {
       id: 'l-1',
       title: 'Vite Relative Base for GitHub Pages',
       note: "Always set base: './' in vite.config.ts so assets resolve on repository subpaths (e.g. /sams/).",
+      content: `# Vite Relative Base for GitHub Pages\n\nWhen deploying a Single Page App (SPA) to GitHub Pages, the project is served on a subpath (e.g. \`https://username.github.io/repo-name/\`).\n\n### The Problem\nBy default, Vite assumes \`base: '/'\`, causing browsers to request \`https://username.github.io/assets/...\` instead of \`.../repo-name/assets/...\`, resulting in white 404 screens.\n\n### The Solution\nIn \`vite.config.ts\`:\n\`\`\`typescript\nexport default defineConfig({\n  base: './',\n  plugins: [react(), tailwindcss()]\n});\n\`\`\`\nThis generates relative asset paths (\`./assets/...\`) that load seamlessly on any domain or subpath!`,
       category: 'architecture',
       projectName: 'SAMS',
       createdAt: Date.now() - 3600000,
@@ -144,6 +156,7 @@ export function App() {
       id: 'l-2',
       title: 'Auto-Enablement on configure-pages Action',
       note: "Set enablement: true on actions/configure-pages@v5 to avoid HttpError 404 when activating Pages.",
+      content: `# Auto-Enablement on configure-pages Action\n\nWhen setting up GitHub Actions for GitHub Pages on a newly created repository, the Pages site API resource may not exist yet.\n\n### The Fix\nPass \`enablement: true\` in \`.github/workflows/deploy.yml\`:\n\`\`\`yaml\n- name: Setup Pages\n  uses: actions/configure-pages@v5\n  with:\n    enablement: true\n\`\`\`\nThis tells GitHub Actions to activate Pages automatically via the GitHub REST API!`,
       category: 'bugfix',
       projectName: 'DevOps',
       createdAt: Date.now() - 1800000,
@@ -152,6 +165,7 @@ export function App() {
       id: 'l-3',
       title: 'WebGL Visibility Lifecycle Guard',
       note: 'Listen to document.hidden / visibilitychange to pause requestAnimationFrame and save unified memory.',
+      content: `# WebGL Visibility Lifecycle Guard\n\nContinuous Three.js render loops (\`requestAnimationFrame\`) can consume significant CPU and battery when running in hidden tabs.\n\n### The Guard\n\`\`\`typescript\nconst handleVisibilityChange = () => {\n  if (document.hidden) {\n    isPaused = true;\n    cancelAnimationFrame(animId);\n  } else {\n    isPaused = false;\n    clock.start();\n    animate();\n  }\n};\ndocument.addEventListener('visibilitychange', handleVisibilityChange);\n\`\`\`\nSaves battery and keeps unified memory cool on Apple Silicon!`,
       category: 'insight',
       projectName: 'ThreeBot',
       createdAt: Date.now() - 900000,
@@ -160,11 +174,80 @@ export function App() {
 
   const DEFAULT_TODOS: QuickTodoItem[] = [
     { id: 'todo-1', text: 'Review 3-column Projects | Learn | To do layout', completed: true, priority: 'normal', createdAt: Date.now() },
-    { id: 'todo-2', text: 'Verify cross-project Kanban board task transitions', completed: false, priority: 'urgent', createdAt: Date.now() },
-    { id: 'todo-3', text: 'Push live build to GitHub Pages and test on mobile', completed: false, priority: 'normal', createdAt: Date.now() },
+    { id: 'todo-2', text: 'Verify cross-project Kanban board task transitions', completed: true, priority: 'urgent', createdAt: Date.now() },
+    { id: 'todo-3', text: 'Explore P.A.R.A. Areas of Responsibility & Archives view', completed: false, priority: 'urgent', createdAt: Date.now() },
   ];
 
-  // State Management
+  const DEFAULT_AREAS: AreaOfResponsibility[] = [
+    {
+      id: 'area-1',
+      name: 'DevOps & Cloud CI/CD',
+      icon: '🚀',
+      description: 'GitHub Actions, GitHub Pages deployment, DNS, and serverless hosting.',
+      standards: [
+        "Always set base: './' in Vite config for GitHub Pages subpath deployment.",
+        "Include enablement: true on actions/configure-pages@v5 for auto-activation.",
+        "Keep build steps isolated so web builds pass without network access when sandboxed.",
+      ],
+      color: '#3B82F6',
+    },
+    {
+      id: 'area-2',
+      name: 'Agentic AI & Antigravity',
+      icon: '🤖',
+      description: 'Subagent orchestration, plan milestones, and prompt engineering.',
+      standards: [
+        'Targeted file reads (<50ms) over deep directory traversal to protect M1 unified memory.',
+        'Auto-analyze codebases on link to derive accomplishments and actionable deliverables.',
+        'Always explore pros, cons, and better proposals before architectural pivots.',
+      ],
+      color: '#8B5CF6',
+    },
+    {
+      id: 'area-3',
+      name: 'Modern Frontend & 3D UI',
+      icon: '🎨',
+      description: 'React 18, Tailwind CSS v4, Three.js WebGL, and accessible design.',
+      standards: [
+        'Conserve battery and memory by pausing requestAnimationFrame on document.hidden.',
+        'Maintain crisp dual themes (White+Blue light mode and Deep Slate dark mode).',
+        'Use native HTML5 <dialog> with backdrop dismiss and Esc accessibility.',
+      ],
+      color: '#10B981',
+    },
+    {
+      id: 'area-4',
+      name: 'Data Architecture & Storage',
+      icon: '💾',
+      description: 'Local-first SQLite, browser localStorage caching, and external SSD vault.',
+      standards: [
+        'Dual-Mode persistence: operate serverless on GitHub Pages and sync to local backend.',
+        'Store project notes in Markdown with YAML frontmatter for Obsidian compatibility.',
+      ],
+      color: '#F59E0B',
+    },
+  ];
+
+  const DEFAULT_ARCHIVES: ArchivedProject[] = [
+    {
+      id: 'sams-phase-a',
+      name: 'SAMS Phase A Architecture',
+      workspacePath: '~/Projects/personal_ai/legacy',
+      githubRepo: 'akmalxz/sams',
+      completedAt: Date.now() - 86400000 * 2,
+      summary: 'Initial spatial management system blueprint and server middleware setup.',
+      accomplishments: [
+        'Express + Bun server setup with SQLite WAL journal mode',
+        'Initial 3D room SVG wireframe and bot visor states',
+        'Multi-project database schema and task persistence',
+      ],
+      totalTasksCompleted: 4,
+    },
+  ];
+
+  // --- Second Brain State (P.A.R.A.) ---
+  const [activeParaTab, setActiveParaTab] = useState<'deck' | 'areas' | 'archives'>('deck');
+
   const [projects, setProjects] = useState<Project[]>(() => {
     try {
       const saved = localStorage.getItem('sams-projects');
@@ -189,6 +272,23 @@ export function App() {
     return DEFAULT_TODOS;
   });
 
+  const [areas, setAreas] = useState<AreaOfResponsibility[]>(() => {
+    try {
+      const saved = localStorage.getItem('sams-para-areas');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return DEFAULT_AREAS;
+  });
+
+  const [archives, setArchives] = useState<ArchivedProject[]>(() => {
+    try {
+      const saved = localStorage.getItem('sams-para-archives');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return DEFAULT_ARCHIVES;
+  });
+
+  const [activeNoteDrawer, setActiveNoteDrawer] = useState<LearningNote | null>(null);
   const [backendOnline, setBackendOnline] = useState(false);
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
   const [reanalyzingProject, setReanalyzingProject] = useState<Project | null>(null);
@@ -413,7 +513,92 @@ export function App() {
     }
   };
 
-  // --- Learning Notes Handlers ---
+  // --- Archive Project (P -> A in PARA) ---
+  const handleArchiveProject = (project: Project) => {
+    const doneTasks = (project.tasks || []).filter((t) => t.status === 'done');
+    const accomplishments = doneTasks.map((t) => t.title.replace(/\*\*/g, ''));
+    if (project.git?.lastCommitMessage) {
+      accomplishments.unshift(`${project.git.lastCommitMessage} (${project.git.lastCommitHash || 'HEAD'})`);
+    }
+
+    const archivedItem: ArchivedProject = {
+      id: `archive-${project.id}-${Date.now()}`,
+      name: project.name,
+      workspacePath: project.workspacePath,
+      githubRepo: project.githubRepo,
+      completedAt: Date.now(),
+      summary: project.currentFocus || project.description || 'Project delivered and archived.',
+      accomplishments,
+      totalTasksCompleted: doneTasks.length,
+    };
+
+    setArchives((prev) => {
+      const next = [archivedItem, ...prev];
+      try {
+        localStorage.setItem('sams-para-archives', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    handleUnlinkProject(project.id);
+  };
+
+  const handleRestoreArchivedProject = (archived: ArchivedProject) => {
+    const restored: Project = {
+      id: archived.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      name: archived.name,
+      workspacePath: archived.workspacePath,
+      githubRepo: archived.githubRepo,
+      description: archived.summary,
+      status: 'on_track',
+      currentFocus: `Resumed from archive: ${archived.summary}`,
+      progressPercent: 100,
+      createdAt: archived.completedAt,
+      updatedAt: Date.now(),
+      git: {
+        isGitRepo: true,
+        branch: 'main',
+        uncommittedChanges: 0,
+      },
+      tasks: archived.accomplishments.map((acc, i) => ({
+        id: `task-restored-${i}`,
+        projectId: archived.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        title: acc,
+        status: 'done',
+        priority: 'medium',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      })),
+    };
+
+    setProjects((prev) => {
+      const next = [restored, ...prev];
+      try {
+        localStorage.setItem('sams-projects', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    setArchives((prev) => {
+      const next = prev.filter((a) => a.id !== archived.id);
+      try {
+        localStorage.setItem('sams-para-archives', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const handleDeleteArchive = (id: string) => {
+    setArchives((prev) => {
+      const next = prev.filter((a) => a.id !== id);
+      try {
+        localStorage.setItem('sams-para-archives', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  // --- Learning Notes Handlers (Resources in PARA) ---
   const handleAddLearning = (item: Omit<LearningNote, 'id' | 'createdAt'>) => {
     const newNote: LearningNote = {
       ...item,
@@ -429,6 +614,17 @@ export function App() {
     });
   };
 
+  const handleSaveNote = (updated: LearningNote) => {
+    setLearnings((prev) => {
+      const next = prev.map((l) => (l.id === updated.id ? updated : l));
+      try {
+        localStorage.setItem('sams-learnings', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+    setActiveNoteDrawer(updated);
+  };
+
   const handleDeleteLearning = (id: string) => {
     setLearnings((prev) => {
       const next = prev.filter((l) => l.id !== id);
@@ -437,6 +633,19 @@ export function App() {
       } catch {}
       return next;
     });
+    if (activeNoteDrawer?.id === id) {
+      setActiveNoteDrawer(null);
+    }
+  };
+
+  const handleConvertNoteToTask = (title: string, projectName?: string) => {
+    const targetProject =
+      projects.find((p) => p.name.toLowerCase() === projectName?.toLowerCase()) ||
+      (projects.length > 0 ? projects[0] : null);
+
+    if (targetProject) {
+      handleAddTask(targetProject.id, `Apply learning: ${title}`, 'backlog');
+    }
   };
 
   // --- Quick Todos Handlers ---
@@ -477,12 +686,39 @@ export function App() {
     });
   };
 
+  // --- Areas Handlers (Areas in PARA) ---
+  const handleAddAreaStandard = (areaId: string, standard: string) => {
+    setAreas((prev) => {
+      const next = prev.map((a) => {
+        if (a.id !== areaId) return a;
+        return { ...a, standards: [...a.standards, standard] };
+      });
+      try {
+        localStorage.setItem('sams-para-areas', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const handleRemoveAreaStandard = (areaId: string, index: number) => {
+    setAreas((prev) => {
+      const next = prev.map((a) => {
+        if (a.id !== areaId) return a;
+        return { ...a, standards: a.standards.filter((_, i) => i !== index) };
+      });
+      try {
+        localStorage.setItem('sams-para-areas', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
   // Derive Bot Mood & Status Message
   const botTelemetry = useMemo(() => {
     if (projects.length === 0) {
       return {
         mood: 'focus' as BotMood,
-        message: 'Welcome to SAMS! Click "+ Link Project" to track your codebases.',
+        message: 'Second Brain initialized. Click "+ Link Project" to track your codebases.',
       };
     }
 
@@ -497,17 +733,17 @@ export function App() {
     if (dirtyProjects.length > 0) {
       return {
         mood: 'dirty' as BotMood,
-        message: `Tracking ${projects.length} projects. ${dirtyProjects.length} with pending local changes. ${totalOpenTasks} open deliverables in Kanban.`,
+        message: `Second Brain: ${projects.length} active projects, ${areas.length} areas of standard, ${archives.length} archived retrospectives.`,
       };
     }
 
     return {
       mood: 'clean' as BotMood,
       message: backendOnline
-        ? `Live Mac Sync: All ${projects.length} codebases clean & synced! ${totalOpenTasks} deliverables in Kanban.`
-        : `Interactive Cloud Mode: Tracking ${projects.length} codebases with 3D SAM. Pull latest commits anytime via GitHub Sync!`,
+        ? `Live Second Brain: All ${projects.length} codebases clean & synced! ${learnings.length} resource notes documented.`
+        : `Cloud Second Brain: P.A.R.A. active with 3D SAM. Syncing real-time commits via GitHub API!`,
     };
-  }, [projects, backendOnline]);
+  }, [projects, backendOnline, areas.length, archives.length, learnings.length]);
 
   return (
     <div className="min-h-screen bg-canvas text-ink font-sans transition-colors duration-200 flex flex-col">
@@ -522,16 +758,53 @@ export function App() {
             <div className="flex items-center gap-2">
               <h1 className="font-bold text-sm tracking-tight text-ink">SAMS</h1>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue/10 text-blue font-semibold border border-blue/20">
-                Command Deck
+                Second Brain
               </span>
             </div>
             <p className="hidden sm:block text-[11px] text-ink-muted">
-              Projects · Learn · To do · Cross-Project Kanban
+              P.A.R.A. Method · Projects · Areas · Resources · Archives
             </p>
           </div>
         </div>
 
-        {/* Center / Right Toolbar */}
+        {/* Center: P.A.R.A. Navigation Switcher */}
+        <div className="hidden md:flex items-center gap-1 bg-elevated/70 p-1 rounded-xl border border-line text-xs font-mono">
+          <button
+            type="button"
+            onClick={() => setActiveParaTab('deck')}
+            className={`px-3 py-1 rounded-lg cursor-pointer transition-colors ${
+              activeParaTab === 'deck'
+                ? 'bg-surface text-ink font-bold shadow-2xs'
+                : 'text-ink-muted hover:text-ink'
+            }`}
+          >
+            ☷ Command Deck
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveParaTab('areas')}
+            className={`px-3 py-1 rounded-lg cursor-pointer transition-colors ${
+              activeParaTab === 'areas'
+                ? 'bg-surface text-purple-600 dark:text-purple-400 font-bold shadow-2xs'
+                : 'text-ink-muted hover:text-ink'
+            }`}
+          >
+            🌐 Areas ({areas.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveParaTab('archives')}
+            className={`px-3 py-1 rounded-lg cursor-pointer transition-colors ${
+              activeParaTab === 'archives'
+                ? 'bg-surface text-emerald-600 dark:text-emerald-400 font-bold shadow-2xs'
+                : 'text-ink-muted hover:text-ink'
+            }`}
+          >
+            📦 Archives ({archives.length})
+          </button>
+        </div>
+
+        {/* Right Toolbar */}
         <div className="flex items-center gap-3">
           {/* Backend Connection Indicator */}
           <div
@@ -546,7 +819,7 @@ export function App() {
                 backendOnline ? 'bg-emerald-500 animate-pulse' : 'bg-blue'
               }`}
             />
-            <span className="hidden md:inline font-medium">
+            <span className="hidden lg:inline font-medium">
               {backendOnline ? 'Live Backend (Mac)' : 'Cloud Web Mode'}
             </span>
           </div>
@@ -617,102 +890,196 @@ export function App() {
           </div>
 
           {/* Quick Metrics Pills */}
-          <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-center font-mono text-xs">
-            <div className="px-3 py-1.5 rounded-xl border border-line bg-canvas text-center">
+          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center font-mono text-xs">
+            <button
+              type="button"
+              onClick={() => setActiveParaTab('deck')}
+              className={`px-3 py-1.5 rounded-xl border transition-colors text-center cursor-pointer ${
+                activeParaTab === 'deck' ? 'border-blue bg-blue/5' : 'border-line bg-canvas'
+              }`}
+            >
               <span className="text-[10px] text-ink-muted uppercase block">Projects</span>
-              <span className="font-bold text-ink">{projects.length}</span>
-            </div>
-            <div className="px-3 py-1.5 rounded-xl border border-line bg-canvas text-center">
-              <span className="text-[10px] text-ink-muted uppercase block">Learnings</span>
-              <span className="font-bold text-purple-500">{learnings.length}</span>
-            </div>
-            <div className="px-3 py-1.5 rounded-xl border border-line bg-canvas text-center">
-              <span className="text-[10px] text-ink-muted uppercase block">Todos</span>
-              <span className="font-bold text-emerald-500">{todos.filter((t) => !t.completed).length}</span>
-            </div>
+              <span className="font-bold text-blue">{projects.length}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveParaTab('areas')}
+              className={`px-3 py-1.5 rounded-xl border transition-colors text-center cursor-pointer ${
+                activeParaTab === 'areas' ? 'border-purple-500 bg-purple-500/5' : 'border-line bg-canvas'
+              }`}
+            >
+              <span className="text-[10px] text-ink-muted uppercase block">Areas</span>
+              <span className="font-bold text-purple-500">{areas.length}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveParaTab('deck')}
+              className="px-3 py-1.5 rounded-xl border border-line bg-canvas text-center cursor-pointer"
+            >
+              <span className="text-[10px] text-ink-muted uppercase block">Resources</span>
+              <span className="font-bold text-ink">{learnings.length}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveParaTab('archives')}
+              className={`px-3 py-1.5 rounded-xl border transition-colors text-center cursor-pointer ${
+                activeParaTab === 'archives' ? 'border-emerald-500 bg-emerald-500/5' : 'border-line bg-canvas'
+              }`}
+            >
+              <span className="text-[10px] text-ink-muted uppercase block">Archives</span>
+              <span className="font-bold text-emerald-500">{archives.length}</span>
+            </button>
           </div>
         </div>
 
-        {/* --- SECTION 1 (TOP TIER): 3 Columns [ Projects | Learn | To do ] --- */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-          {/* 1. Projects Column */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-line">
-              <div className="flex items-center gap-2">
-                <span className="text-blue font-bold">🔷</span>
-                <h2 className="text-sm font-bold text-ink tracking-tight">Projects</h2>
-                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-elevated border border-line text-ink-muted">
-                  {projects.length}
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsLinkDialogOpen(true)}
-                className="text-xs font-semibold text-blue hover:underline cursor-pointer flex items-center gap-0.5"
-              >
-                <span>+</span> Link
-              </button>
-            </div>
+        {/* Mobile View Switcher */}
+        <div className="flex md:hidden items-center justify-around bg-elevated/70 p-1 rounded-xl border border-line text-xs font-mono">
+          <button
+            type="button"
+            onClick={() => setActiveParaTab('deck')}
+            className={`flex-1 py-1 text-center rounded-lg ${
+              activeParaTab === 'deck' ? 'bg-surface text-ink font-bold' : 'text-ink-muted'
+            }`}
+          >
+            Deck
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveParaTab('areas')}
+            className={`flex-1 py-1 text-center rounded-lg ${
+              activeParaTab === 'areas' ? 'bg-surface text-purple-600 font-bold' : 'text-ink-muted'
+            }`}
+          >
+            Areas
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveParaTab('archives')}
+            className={`flex-1 py-1 text-center rounded-lg ${
+              activeParaTab === 'archives' ? 'bg-surface text-emerald-600 font-bold' : 'text-ink-muted'
+            }`}
+          >
+            Archives
+          </button>
+        </div>
 
-            {projects.length === 0 ? (
-              <div className="p-8 rounded-2xl border-2 border-dashed border-line text-center space-y-2">
-                <p className="text-xs text-ink-muted">No projects tracked yet.</p>
-                <button
-                  type="button"
-                  onClick={() => setIsLinkDialogOpen(true)}
-                  className="px-3 py-1.5 rounded-lg bg-blue text-white text-xs font-semibold shadow-xs"
-                >
-                  Link First Project
-                </button>
-              </div>
-            ) : (
+        {/* --- VIEW 1: COMMAND DECK (P.A.R.A. Projects & Resources & Kanban) --- */}
+        {activeParaTab === 'deck' && (
+          <div className="space-y-6">
+            {/* Top 3 Columns [ Projects (P) | Learn / Resources (R) | To do ] */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+              {/* 1. Projects Column */}
               <div className="space-y-4">
-                {projects.map((project) => (
-                  <ProjectRadarCard
-                    key={project.id}
-                    project={project}
-                    onToggleTask={handleToggleTask}
-                    onAddTask={handleAddTask}
-                    onUpdateFocus={handleUpdateFocus}
-                    onSyncPulse={(p) => setReanalyzingProject(p)}
-                    onUnlinkProject={handleUnlinkProject}
-                    onUpdateProject={handleUpdateProject}
-                  />
-                ))}
+                <div className="flex items-center justify-between pb-2 border-b border-line">
+                  <div className="flex items-center gap-2">
+                    <span className="text-blue font-bold">🔷</span>
+                    <h2 className="text-sm font-bold text-ink tracking-tight">Projects (P)</h2>
+                    <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-elevated border border-line text-ink-muted">
+                      {projects.length}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsLinkDialogOpen(true)}
+                    className="text-xs font-semibold text-blue hover:underline cursor-pointer flex items-center gap-0.5"
+                  >
+                    <span>+</span> Link
+                  </button>
+                </div>
+
+                {projects.length === 0 ? (
+                  <div className="p-8 rounded-2xl border-2 border-dashed border-line text-center space-y-2">
+                    <p className="text-xs text-ink-muted">No projects tracked yet.</p>
+                    <button
+                      type="button"
+                      onClick={() => setIsLinkDialogOpen(true)}
+                      className="px-3 py-1.5 rounded-lg bg-blue text-white text-xs font-semibold shadow-xs"
+                    >
+                      Link First Project
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {projects.map((project) => (
+                      <ProjectRadarCard
+                        key={project.id}
+                        project={project}
+                        onToggleTask={handleToggleTask}
+                        onAddTask={handleAddTask}
+                        onUpdateFocus={handleUpdateFocus}
+                        onSyncPulse={(p) => setReanalyzingProject(p)}
+                        onUnlinkProject={handleUnlinkProject}
+                        onArchiveProject={handleArchiveProject}
+                        onUpdateProject={handleUpdateProject}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          {/* 2. Learn Column */}
-          <div>
-            <LearnSection
-              learnings={learnings}
-              onAddLearning={handleAddLearning}
-              onDeleteLearning={handleDeleteLearning}
-            />
-          </div>
+              {/* 2. Learn / Resources Column */}
+              <div>
+                <LearnSection
+                  learnings={learnings}
+                  onAddLearning={handleAddLearning}
+                  onDeleteLearning={handleDeleteLearning}
+                  onSelectNote={(n) => setActiveNoteDrawer(n)}
+                />
+              </div>
 
-          {/* 3. To do Column */}
-          <div>
-            <QuickTodoSection
-              todos={todos}
-              onToggleTodo={handleToggleTodo}
-              onAddTodo={handleAddTodo}
-              onDeleteTodo={handleDeleteTodo}
-            />
-          </div>
-        </div>
+              {/* 3. To do / Immediate Action Column */}
+              <div>
+                <QuickTodoSection
+                  todos={todos}
+                  onToggleTodo={handleToggleTodo}
+                  onAddTodo={handleAddTodo}
+                  onDeleteTodo={handleDeleteTodo}
+                />
+              </div>
+            </div>
 
-        {/* --- SECTION 2 (BOTTOM TIER): 1 Unified Cross-Project Kanban Board --- */}
-        <div>
-          <UnifiedKanbanBoard
-            projects={projects}
-            onUpdateTaskStatus={handleUpdateTaskStatus}
-            onAddTask={handleAddTask}
-            onDeleteTask={handleDeleteTask}
+            {/* Bottom: Unified Cross-Project Kanban Board */}
+            <div>
+              <UnifiedKanbanBoard
+                projects={projects}
+                onUpdateTaskStatus={handleUpdateTaskStatus}
+                onAddTask={handleAddTask}
+                onDeleteTask={handleDeleteTask}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* --- VIEW 2: AREAS OF RESPONSIBILITY (P.A.R.A. Areas) --- */}
+        {activeParaTab === 'areas' && (
+          <AreasSection
+            areas={areas}
+            onAddStandard={handleAddAreaStandard}
+            onRemoveStandard={handleRemoveAreaStandard}
           />
-        </div>
+        )}
+
+        {/* --- VIEW 3: ARCHIVES & RETROSPECTIVES (P.A.R.A. Archives) --- */}
+        {activeParaTab === 'archives' && (
+          <ArchivesSection
+            archives={archives}
+            onRestoreProject={handleRestoreArchivedProject}
+            onDeleteArchive={handleDeleteArchive}
+          />
+        )}
       </main>
+
+      {/* Markdown Note Deep Editor Drawer */}
+      <MarkdownNoteDrawer
+        isOpen={Boolean(activeNoteDrawer)}
+        note={activeNoteDrawer}
+        onClose={() => setActiveNoteDrawer(null)}
+        onSaveNote={handleSaveNote}
+        onConvertToKanbanTask={handleConvertNoteToTask}
+      />
 
       {/* Modals & Dialogs */}
       <LinkProjectDialog

@@ -5,12 +5,14 @@ interface LearnSectionProps {
   learnings: LearningNote[];
   onAddLearning: (learning: Omit<LearningNote, 'id' | 'createdAt'>) => void;
   onDeleteLearning: (id: string) => void;
+  onSelectNote?: (note: LearningNote) => void;
 }
 
 export const LearnSection: React.FC<LearnSectionProps> = ({
   learnings,
   onAddLearning,
   onDeleteLearning,
+  onSelectNote,
 }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [title, setTitle] = useState('');
@@ -159,7 +161,8 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
           learnings.map((item) => (
             <div
               key={item.id}
-              className="p-3 rounded-xl border border-line bg-canvas/60 hover:bg-canvas transition-colors space-y-1.5 group relative"
+              onClick={() => onSelectNote && onSelectNote(item)}
+              className="p-3 rounded-xl border border-line bg-canvas/60 hover:bg-canvas hover:border-blue/40 transition-colors space-y-1.5 group relative cursor-pointer"
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-1.5 flex-wrap">

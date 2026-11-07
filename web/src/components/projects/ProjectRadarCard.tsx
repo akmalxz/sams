@@ -9,6 +9,7 @@ interface ProjectRadarCardProps {
   onUpdateFocus: (projectId: string, focus: string) => void;
   onSyncPulse: (project: Project) => void;
   onUnlinkProject: (projectId: string) => void;
+  onArchiveProject?: (project: Project) => void;
   onUpdateProject?: (projectId: string, updates: Partial<Project>) => void;
 }
 
@@ -19,6 +20,7 @@ export const ProjectRadarCard: React.FC<ProjectRadarCardProps> = ({
   onUpdateFocus,
   onSyncPulse,
   onUnlinkProject,
+  onArchiveProject,
   onUpdateProject,
 }) => {
   const [isEditingFocus, setIsEditingFocus] = useState(false);
@@ -186,6 +188,21 @@ export const ProjectRadarCard: React.FC<ProjectRadarCardProps> = ({
           >
             <span className="text-blue font-bold">⚡</span> Pulse
           </button>
+
+          {onArchiveProject && (
+            <button
+              type="button"
+              onClick={() => {
+                if (confirm(`Archive ${project.name} to P.A.R.A. Archives?`)) {
+                  onArchiveProject(project);
+                }
+              }}
+              className="w-7 h-7 rounded-lg border border-line bg-elevated hover:bg-surface hover:border-purple-500/50 text-ink-muted hover:text-purple-500 text-xs transition-colors cursor-pointer flex items-center justify-center"
+              title="Archive project to P.A.R.A. Archives"
+            >
+              📦
+            </button>
+          )}
 
           <button
             type="button"

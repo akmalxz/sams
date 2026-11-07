@@ -53,9 +53,32 @@ export interface LearningNote {
   id: string;
   title: string;
   note: string;
+  content?: string; // Rich markdown content
   category: 'insight' | 'bugfix' | 'architecture' | 'command';
   projectName?: string;
+  areaName?: string;
   createdAt: number;
+  updatedAt?: number;
+}
+
+export interface AreaOfResponsibility {
+  id: string;
+  name: string;
+  icon: string;
+  description: string;
+  standards: string[];
+  color: string;
+}
+
+export interface ArchivedProject {
+  id: string;
+  name: string;
+  workspacePath: string;
+  githubRepo?: string;
+  completedAt: number;
+  summary: string;
+  accomplishments: string[];
+  totalTasksCompleted: number;
 }
 
 export interface QuickTodoItem {
