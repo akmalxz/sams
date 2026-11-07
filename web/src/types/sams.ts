@@ -177,6 +177,9 @@ export interface ProjectAnalysisResult {
   };
   antigravitySessionFound: boolean;
   antigravityGoal?: string;
+  themeProfile?: ProjectThemeProfile;
+  workingRules?: ProjectWorkingRules;
+  architectureMap?: ProjectArchitectureMap;
 }
 
 // --- Vault Memory Capsule Types ---

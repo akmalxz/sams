@@ -109,3 +109,20 @@ export const IconGripVertical: React.FC<IconProps> = ({ className = 'w-3.5 h-3.5
     <circle cx="15" cy="19" r="1" />
   </svg>
 );
+
+export const IconBrain: React.FC<IconProps> = ({ className = 'w-3.5 h-3.5' }) => (
+  <svg aria-hidden="true" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" />
+    <path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z" />
+    <path d="M12 5v13" />
+    <path d="M9.5 9.5 12 12m0 0 2.5-2.5M12 12l-2 3m2-3 2 3" />
+  </svg>
+);
+
+export const IconDownload: React.FC<IconProps> = ({ className = 'w-3.5 h-3.5' }) => (
+  <svg aria-hidden="true" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="7 10 12 15 17 10" />
+    <line x1="12" y1="15" x2="12" y2="3" />
+  </svg>
+);

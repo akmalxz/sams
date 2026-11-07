@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Project, ProjectStatus, ProjectTask } from '../../types/sams';
 import { parseGitHubRepo, fetchGitHubRepoPulse, GitHubPulseResult } from '../../utils/githubSync';
-import { IconArchiveBox, IconCheck, IconClose, IconCloudSync, IconPulse } from '../ui/Icons';
+import { IconArchiveBox, IconBrain, IconCheck, IconClose, IconCloudSync, IconPulse } from '../ui/Icons';
 
 interface ProjectRadarCardProps {
   project: Project;
@@ -10,6 +10,7 @@ interface ProjectRadarCardProps {
   onUpdateFocus: (projectId: string, focus: string) => void;
   onSyncPulse: (project: Project) => void;
   onUnlinkProject: (projectId: string) => void;
+  onOpenMemory?: (project: Project) => void;
   onArchiveProject?: (project: Project) => void;
   onUpdateProject?: (projectId: string, updates: Partial<Project>) => void;
 }
@@ -21,6 +22,7 @@ export const ProjectRadarCard: React.FC<ProjectRadarCardProps> = ({
   onUpdateFocus,
   onSyncPulse,
   onUnlinkProject,
+  onOpenMemory,
   onArchiveProject,
   onUpdateProject,
 }) => {
@@ -197,6 +199,23 @@ export const ProjectRadarCard: React.FC<ProjectRadarCardProps> = ({
             <IconPulse className="w-3.5 h-3.5 text-blue" />
             <span>Pulse</span>
           </button>
+
+          {onOpenMemory && (
+            <button
+              type="button"
+              onClick={() => onOpenMemory(project)}
+              className="px-2 py-1 rounded-lg border border-line bg-surface hover:border-purple-500/50 text-[11px] font-semibold text-ink-muted hover:text-purple-600 dark:hover:text-purple-400 transition-colors cursor-pointer flex items-center gap-1"
+              title="Open Vault Project Memory (4-file Markdown Capsule)"
+            >
+              <IconBrain className="w-3.5 h-3.5 text-purple-500" />
+              <span>Memory</span>
+              {project.vaultStatus === 'synced_ssd' ? (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="SSD Vault Synced" />
+              ) : (
+                <span className="w-1.5 h-1.5 rounded-full bg-blue" title="APFS Mirrored / Local" />
+              )}
+            </button>
+          )}
 
           {onArchiveProject && (
             <button

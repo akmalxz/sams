@@ -7,8 +7,11 @@ import {
   QuickTodoItem,
   AreaOfResponsibility,
   ArchivedProject,
+  ProjectMemoryCapsule,
+  ProjectMemoryDocType,
 } from './types/sams';
 import { ProjectRadarCard } from './components/projects/ProjectRadarCard';
+import { ProjectMemoryDrawer } from './components/projects/ProjectMemoryDrawer';
 import { LearnSection } from './components/learn/LearnSection';
 import { QuickTodoSection } from './components/todo/QuickTodoSection';
 import { UnifiedKanbanBoard } from './components/kanban/UnifiedKanbanBoard';
@@ -319,6 +322,9 @@ export function App() {
   });
 
   const [activeNoteDrawer, setActiveNoteDrawer] = useState<LearningNote | null>(null);
+  const [activeMemoryProject, setActiveMemoryProject] = useState<Project | null>(null);
+  const [activeMemoryCapsule, setActiveMemoryCapsule] = useState<ProjectMemoryCapsule | null>(null);
+  const [isMemoryLoading, setIsMemoryLoading] = useState(false);
   const [backendOnline, setBackendOnline] = useState(false);
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
   const [reanalyzingProject, setReanalyzingProject] = useState<Project | null>(null);
@@ -674,6 +680,284 @@ export function App() {
       } catch {}
       return next;
     });
+  };
+
+  // --- Project Memory Capsule & Obsidian Vault Handlers ---
+  const createDefaultMockCapsule = (project: Project): ProjectMemoryCapsule => {
+    const isPersonalAI = project.id.includes('personal-ai');
+    const stylingEngine = isPersonalAI ? 'tailwind-v4' : 'tailwind-v3';
+    const colorTokens = isPersonalAI
+      ? [
+          { name: '--color-canvas', value: '#FFFFFF', category: 'canvas' as const },
+          { name: '--color-surface', value: '#F8FAFC', category: 'surface' as const },
+          { name: '--color-elevated', value: '#F1F5F9', category: 'elevated' as const },
+          { name: '--color-blue', value: '#0A84FF', category: 'brand' as const },
+          { name: '--color-ink', value: '#0F172A', category: 'ink' as const },
+          { name: '--color-line', value: '#E2E8F0', category: 'line' as const },
+        ]
+      : [
+          { name: '--primary', value: '#10B981', category: 'brand' as const },
+          { name: '--background', value: '#0F172A', category: 'canvas' as const },
+          { name: '--surface', value: '#1E293B', category: 'surface' as const },
+          { name: '--accent', value: '#38BDF8', category: 'accent' as const },
+        ];
+
+    const packageManager = isPersonalAI ? 'bun' : 'pnpm';
+    const slug = project.id;
+    const vaultPath = `_Projects/${slug}`;
+
+    const overviewMd = `---
+type: project_overview
+project_slug: "${slug}"
+name: "${project.name}"
+status: "${project.status}"
+workspace_path: "${project.workspacePath}"
+generated_by: "sams_memory_capsule"
+---
+
+# Project Charter: ${project.name}
+
+> ${project.description || 'Modern system managed via SAMS and Google Antigravity.'}
+
+## System Overview & Architecture
+- **Workspace**: \`${project.workspacePath}\`
+- **Current Active Focus**: ${project.currentFocus || 'Core architecture milestone'}
+- **Deliverables Total**: ${(project.tasks || []).length} items tracked
+- **Repository**: ${project.githubRepo ? `https://github.com/${project.githubRepo}` : 'Local Git repository'}
+
+### Key Architectural Layers
+- **Frontend**: React 18, Vite, Modern Web Guidance, Native HTML5 Top-Layer Dialogs
+- **Backend Services**: Bun runtime, SQLite WAL, Atomic Staging Guard, Obsidian Vault Two-Way Sync
+- **AI Agent Integration**: Google Antigravity Brain, Serial Queue, Multi-Persona Routing
+`;
+
+    const themeMd = `---
+type: project_theme_and_design
+project_slug: "${slug}"
+name: "${project.name}"
+styling_engine: "${stylingEngine}"
+---
+
+# UI Theme & Design System DNA: ${project.name}
+
+> Visual DNA, detected CSS tokens, and typography for ${project.name}.
+
+## Styling Engine
+- **Framework**: \`${stylingEngine}\`
+- **Color Scheme**: Dual Light / Dark with \`data-theme\` attribute
+
+## Design Tokens & Palette
+| Token Name | Hex / Value | Semantic Role |
+| :--- | :--- | :--- |
+${colorTokens.map((t) => `| \`${t.name}\` | \`${t.value}\` | ${t.category} |`).join('\n')}
+
+## Typography & Hierarchy
+- **Sans Font**: Inter, system-ui, -apple-system, sans-serif
+- **Mono Font**: JetBrains Mono, Fira Code, ui-monospace, monospace
+- **Contrast Standard**: WCAG AA 4.5:1 minimum on all interactive controls
+`;
+
+    const rulesMd = `---
+type: project_working_rules
+project_slug: "${slug}"
+name: "${project.name}"
+package_manager: "${packageManager}"
+---
+
+# Working Rules & Agent Preferences: ${project.name}
+
+> User preferences, developer guardrails, and architectural invariants for ${project.name}.
+
+## Environment & Build Rules
+- **Package Manager**: Always use \`${packageManager}\` (avoid global npm/yarn).
+- **TypeScript**: Strict typing without \`any\` escapes.
+- **Components**: Functional React with clean hook dependencies.
+
+## Antigravity Agent Directives
+- **Theme Preservation**: Always preserve existing styling tokens from \`01_Theme_and_Design.md\`.
+- **Top-Layer Modals**: Use native HTML5 \`<dialog>\` with \`closedby="any"\` and \`overscroll-behavior: contain\`.
+- **No Mock Regressions**: Real endpoints with offline graceful localStorage fallbacks.
+- **Verification**: Run build and test suites before completing turns.
+`;
+
+    const pulseMd = `---
+type: project_tasks_and_pulse
+project_slug: "${slug}"
+name: "${project.name}"
+status: "${project.status}"
+---
+
+# Live Deliverables & Git Pulse: ${project.name}
+
+> Real-time deliverables and git activity for ${project.name}.
+
+## Deliverables Kanban Board
+${(project.tasks || []).map((t) => `- [${t.status === 'done' ? 'x' : ' '}] **${t.title}** (${t.priority.toUpperCase()}) — Assigned: ${t.assignedAgent || 'architect'}`).join('\n')}
+
+## Git Activity Pulse
+- **Branch**: \`${project.git?.branch || 'main'}\`
+- **Uncommitted Changes**: ${project.git?.uncommittedChanges ?? 0}
+- **Last Commit**: ${project.git?.lastCommitHash ? `\`${project.git.lastCommitHash}\` - ${project.git.lastCommitMessage}` : 'Initialized'}
+`;
+
+    return {
+      projectId: slug,
+      projectSlug: slug,
+      themeProfile: {
+        stylingEngine: stylingEngine as any,
+        colorTokens,
+        palette: {
+          hexColors: colorTokens.map((c) => c.value),
+          rgbColors: [],
+          oklchColors: [],
+          hasLightDark: true,
+        },
+        fonts: {
+          sans: 'Inter, system-ui',
+          mono: 'JetBrains Mono',
+          googleFonts: [],
+        },
+        themeMode: 'auto',
+        detectedThemeAttrs: ['data-theme="light"', 'data-theme="dark"'],
+      },
+      workingRules: {
+        packageManager: packageManager as any,
+        scripts: { build: `${packageManager} run build`, test: `${packageManager} test` },
+        agentInstructions: [],
+        antigravityPreferences: [
+          `Always run ${packageManager} commands inside the project directory`,
+          'Keep TypeScript strict and zero build warnings',
+          'Use native <dialog> with closedby="any" for all modals and drawers',
+        ],
+        architecturalConstraints: [
+          'Local-first storage with two-way Obsidian vault mirroring',
+          'StagingGuard atomic writes to prevent disk corruption',
+        ],
+      },
+      architectureMap: {
+        directories: [
+          { name: 'web', path: 'web', role: 'React/Vite Frontend Client' },
+          { name: 'server', path: 'server', role: 'Bun Express API & Vault Service' },
+        ],
+        entryPoints: ['server/src/index.ts', 'web/src/main.tsx'],
+        ciWorkflows: [{ name: 'Deploy to GitHub Pages', path: '.github/workflows/deploy.yml', triggers: ['push'], targets: ['deploy'] }],
+        safeEnvKeys: ['PORT', 'SSD_ROOT', 'NODE_ENV'],
+      },
+      docs: {
+        overviewMd,
+        themeMd,
+        rulesMd,
+        pulseMd,
+        vaultPath,
+        syncState: 'browser_only',
+        lastSyncedAt: Date.now(),
+      },
+      vaultPath,
+      syncState: 'browser_only',
+      generatedAt: Date.now(),
+    };
+  };
+
+  const handleOpenProjectMemory = async (project: Project) => {
+    setActiveMemoryProject(project);
+    setIsMemoryLoading(true);
+
+    // 1. Try fetching live memory capsule from server
+    try {
+      const res = await fetch(`/api/projects/${project.id}/memory`);
+      if (res.ok) {
+        const capsule: ProjectMemoryCapsule = await res.json();
+        setActiveMemoryCapsule(capsule);
+        try {
+          localStorage.setItem(`sams-memory-${project.id}`, JSON.stringify(capsule));
+        } catch {}
+        setIsMemoryLoading(false);
+        return;
+      }
+    } catch {}
+
+    // 2. Check localStorage cache
+    try {
+      const cached = localStorage.getItem(`sams-memory-${project.id}`);
+      if (cached) {
+        const parsed: ProjectMemoryCapsule = JSON.parse(cached);
+        setActiveMemoryCapsule(parsed);
+        setIsMemoryLoading(false);
+        return;
+      }
+    } catch {}
+
+    // 3. Fallback to client-side default capsule
+    const defaultCapsule = createDefaultMockCapsule(project);
+    setActiveMemoryCapsule(defaultCapsule);
+    try {
+      localStorage.setItem(`sams-memory-${project.id}`, JSON.stringify(defaultCapsule));
+    } catch {}
+    setIsMemoryLoading(false);
+  };
+
+  const handleSaveMemoryDoc = async (docType: ProjectMemoryDocType, content: string) => {
+    if (!activeMemoryProject) return;
+
+    let savedOnServer = false;
+    try {
+      const res = await fetch(`/api/projects/${activeMemoryProject.id}/memory/${docType}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+      });
+      if (res.ok) {
+        savedOnServer = true;
+      }
+    } catch {}
+
+    setActiveMemoryCapsule((prev) => {
+      if (!prev) return prev;
+      const docKey = `${docType}Md` as keyof typeof prev.docs;
+      const updatedDocs = {
+        ...prev.docs,
+        [docKey]: content,
+        lastSyncedAt: Date.now(),
+        syncState: savedOnServer ? prev.syncState : 'browser_only',
+      };
+      const updatedCapsule: ProjectMemoryCapsule = {
+        ...prev,
+        docs: updatedDocs,
+        syncState: savedOnServer ? prev.syncState : 'browser_only',
+      };
+      try {
+        localStorage.setItem(`sams-memory-${activeMemoryProject.id}`, JSON.stringify(updatedCapsule));
+      } catch {}
+      return updatedCapsule;
+    });
+  };
+
+  const handleRegenerateMemory = async () => {
+    if (!activeMemoryProject) return;
+    setIsMemoryLoading(true);
+
+    try {
+      const res = await fetch(`/api/projects/${activeMemoryProject.id}/memory/regenerate`, {
+        method: 'POST',
+      });
+      if (res.ok) {
+        const regenerated: ProjectMemoryCapsule = await res.json();
+        setActiveMemoryCapsule(regenerated);
+        try {
+          localStorage.setItem(`sams-memory-${activeMemoryProject.id}`, JSON.stringify(regenerated));
+        } catch {}
+        setIsMemoryLoading(false);
+        return;
+      }
+    } catch {}
+
+    // Fallback client-side regeneration
+    const freshCapsule = createDefaultMockCapsule(activeMemoryProject);
+    setActiveMemoryCapsule(freshCapsule);
+    try {
+      localStorage.setItem(`sams-memory-${activeMemoryProject.id}`, JSON.stringify(freshCapsule));
+    } catch {}
+    setIsMemoryLoading(false);
   };
 
   // --- Learning Notes Handlers (Resources in PARA) ---
@@ -1159,6 +1443,7 @@ export function App() {
                         onUpdateFocus={handleUpdateFocus}
                         onSyncPulse={(p) => setReanalyzingProject(p)}
                         onUnlinkProject={handleUnlinkProject}
+                        onOpenMemory={handleOpenProjectMemory}
                         onArchiveProject={handleArchiveProject}
                         onUpdateProject={handleUpdateProject}
                       />
@@ -1220,6 +1505,17 @@ export function App() {
         onClose={() => setActiveNoteDrawer(null)}
         onSaveNote={handleSaveNote}
         onConvertToKanbanTask={handleConvertNoteToTask}
+      />
+
+      {/* Project Memory Capsule & Obsidian Vault Drawer */}
+      <ProjectMemoryDrawer
+        project={activeMemoryProject}
+        isOpen={Boolean(activeMemoryProject)}
+        onClose={() => setActiveMemoryProject(null)}
+        memoryCapsule={activeMemoryCapsule}
+        isLoading={isMemoryLoading}
+        onSaveDoc={handleSaveMemoryDoc}
+        onRegenerate={handleRegenerateMemory}
       />
 
       {/* Modals & Dialogs */}

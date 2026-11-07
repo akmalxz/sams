@@ -436,6 +436,7 @@ export class ProjectService {
     description?: string;
     currentFocus?: string;
     status?: ProjectStatus;
+    customRules?: string;
     initialTasks?: Array<{ title: string; priority?: TaskPriority; assignedAgent?: PersonaName }>;
   }): Promise<Project> {
     const absPath = path.resolve(data.workspacePath);
@@ -507,6 +508,11 @@ export class ProjectService {
         currentFocus: project.currentFocus,
         progressPercent: project.progressPercent,
       });
+
+      if (data.customRules && data.customRules.trim()) {
+        capsule.docs.rulesMd = data.customRules.trim();
+      }
+
       await this.vaultStore.writeCapsule(project.id, capsule, false);
     } catch (err) {
       console.warn(`[ProjectService] Could not write initial memory capsule for ${project.id}:`, err);

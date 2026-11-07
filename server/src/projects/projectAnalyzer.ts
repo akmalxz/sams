@@ -294,6 +294,19 @@ export class ProjectAnalyzer {
 
     const currentFocus = antigravityGoal || (latestAccomplishments.length > 0 ? `Next phase after: ${latestAccomplishments[0]}` : 'Initial setup and architectural milestone');
 
+    let themeProfile: ProjectThemeProfile | undefined;
+    let workingRules: ProjectWorkingRules | undefined;
+    let architectureMap: ProjectArchitectureMap | undefined;
+    try {
+      themeProfile = this.extractThemeProfile(absPath);
+    } catch {}
+    try {
+      workingRules = this.extractWorkingRules(absPath);
+    } catch {}
+    try {
+      architectureMap = this.extractArchitectureMap(absPath);
+    } catch {}
+
     return {
       name,
       workspacePath: absPath,
@@ -308,6 +321,9 @@ export class ProjectAnalyzer {
       lastCommit,
       antigravitySessionFound,
       antigravityGoal,
+      themeProfile,
+      workingRules,
+      architectureMap,
     };
   }
 

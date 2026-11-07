@@ -282,7 +282,7 @@ app.get('/api/projects', (req: Request, res: Response) => {
 });
 
 app.post('/api/projects', async (req: Request, res: Response) => {
-  const { name, workspacePath, description, currentFocus, status, initialTasks } = req.body;
+  const { name, workspacePath, description, currentFocus, status, initialTasks, customRules } = req.body;
   if (!name || !workspacePath) {
     return res.status(400).json({ error: 'name and workspacePath are required' });
   }
@@ -294,6 +294,7 @@ app.post('/api/projects', async (req: Request, res: Response) => {
       currentFocus,
       status,
       initialTasks,
+      customRules,
     });
     res.status(201).json(project);
   } catch (err: any) {

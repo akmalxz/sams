@@ -28,6 +28,7 @@ export const LinkProjectDialog: React.FC<LinkProjectDialogProps> = ({
   const [analysisResult, setAnalysisResult] = useState<ProjectAnalysisResult | null>(null);
   const [description, setDescription] = useState('');
   const [currentFocus, setCurrentFocus] = useState('');
+  const [customRules, setCustomRules] = useState('');
   const [selectedDeliverables, setSelectedDeliverables] = useState<boolean[]>([]);
 
   // Sync open state with native dialog
@@ -136,6 +137,21 @@ export const LinkProjectDialog: React.FC<LinkProjectDialogProps> = ({
       setDescription(analysis.summary);
       setCurrentFocus(analysis.currentFocus);
       setSelectedDeliverables(new Array(analysis.suggestedNextDeliverables.length).fill(true));
+
+      // Pre-fill working rules
+      const ruleItems: string[] = [];
+      if (analysis.workingRules?.packageManager && analysis.workingRules.packageManager !== 'unknown') {
+        ruleItems.push(`- Package Manager: Always use ${analysis.workingRules.packageManager}`);
+      }
+      if (analysis.workingRules?.antigravityPreferences && analysis.workingRules.antigravityPreferences.length > 0) {
+        analysis.workingRules.antigravityPreferences.forEach((p) => ruleItems.push(`- ${p}`));
+      } else {
+        ruleItems.push('- Code Quality: Strict TypeScript types with modular separation');
+        ruleItems.push('- Design System: Adhere strictly to detected theme tokens and colors');
+        ruleItems.push('- Verification: Keep tests passing and run build verification');
+      }
+      setCustomRules(ruleItems.join('\n'));
+
       setStep('review');
     } catch (err: any) {
       setErrorMessage(err.message || 'Error analyzing project');
@@ -158,6 +174,7 @@ export const LinkProjectDialog: React.FC<LinkProjectDialogProps> = ({
           workspacePath: workspacePath.trim(),
           description: description.trim() || undefined,
           currentFocus: currentFocus.trim() || undefined,
+          customRules: customRules.trim() || undefined,
           status: 'on_track',
           initialTasks: chosenTasks.map((t) => ({
             title: t.title,
@@ -392,7 +409,99 @@ export const LinkProjectDialog: React.FC<LinkProjectDialogProps> = ({
               />
             </div>
 
-            {/* 4. Suggested Next Deliverables (Select to Import into Kanban) */}
+            {/* 4. Theme DNA & Design Tokens */}
+            {analysisResult.themeProfile && (
+              <div className="rounded-xl bg-elevated/70 border border-line/70 p-3 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-muted">
+                      Theme DNA & Design Tokens
+                    </span>
+                    <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-blue/10 text-blue border border-blue/20">
+                      01_Theme_and_Design.md
+                    </span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-canvas border border-line text-ink font-semibold">
+                    {analysisResult.themeProfile.stylingEngine}
+                  </span>
+                </div>
+
+                {/* Color Swatches */}
+                {analysisResult.themeProfile.colorTokens && analysisResult.themeProfile.colorTokens.length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {analysisResult.themeProfile.colorTokens.slice(0, 10).map((tok, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-line/60 bg-canvas text-[10px] font-mono text-ink shadow-2xs"
+                        title={`${tok.name}: ${tok.value}`}
+                      >
+                        <span
+                          className="w-2.5 h-2.5 rounded-full border border-black/20 shrink-0"
+                          style={{ backgroundColor: tok.value }}
+                        />
+                        <span className="truncate max-w-[90px]">{tok.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : analysisResult.themeProfile.palette?.hexColors && analysisResult.themeProfile.palette.hexColors.length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {analysisResult.themeProfile.palette.hexColors.slice(0, 8).map((hex, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-line/60 bg-canvas text-[10px] font-mono text-ink shadow-2xs"
+                      >
+                        <span
+                          className="w-2.5 h-2.5 rounded-full border border-black/20 shrink-0"
+                          style={{ backgroundColor: hex }}
+                        />
+                        <span>{hex}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-ink-muted">Default system theme</p>
+                )}
+
+                {/* Detected Fonts */}
+                {(analysisResult.themeProfile.fonts?.sans || analysisResult.themeProfile.fonts?.mono || (analysisResult.themeProfile.fonts?.googleFonts && analysisResult.themeProfile.fonts.googleFonts.length > 0)) && (
+                  <div className="flex flex-wrap items-center gap-3 text-[10px] font-mono text-ink-muted pt-1 border-t border-line/40">
+                    {analysisResult.themeProfile.fonts?.sans && (
+                      <span>sans: <strong className="text-ink">{analysisResult.themeProfile.fonts.sans}</strong></span>
+                    )}
+                    {analysisResult.themeProfile.fonts?.mono && (
+                      <span>mono: <strong className="text-ink">{analysisResult.themeProfile.fonts.mono}</strong></span>
+                    )}
+                    {analysisResult.themeProfile.fonts?.googleFonts && analysisResult.themeProfile.fonts.googleFonts.length > 0 && (
+                      <span>fonts: {analysisResult.themeProfile.fonts.googleFonts.join(', ')}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 5. How I Want This Project Done (Working Rules & Agent Guardrails) */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+                  How I Want This Project Done (Working Rules)
+                </label>
+                <span className="text-[10px] font-mono text-ink-subtle">
+                  Vault: 02_Working_Rules.md
+                </span>
+              </div>
+              <textarea
+                rows={3}
+                value={customRules}
+                onChange={(e) => setCustomRules(e.target.value)}
+                placeholder="- Always use bun for package commands&#10;- Strict TypeScript types&#10;- Maintain test suite passes"
+                className="w-full rounded-lg border border-line bg-canvas px-3 py-2 text-xs font-mono text-ink focus:border-blue focus:outline-none resize-none leading-relaxed"
+              />
+              <p className="text-[11px] text-ink-muted mt-0.5">
+                Agent guardrails and preferences saved into your Obsidian Vault to steer future tasks.
+              </p>
+            </div>
+
+            {/* 6. Suggested Next Deliverables (Select to Import into Kanban) */}
             <div className="space-y-2 pt-1 border-t border-line">
               <div className="flex items-center justify-between">
                 <div>
