@@ -184,10 +184,16 @@
   white-space: nowrap !important;
 }
 
-/* Accessible Native Dialog Backdrop Styling */
+/* Accessible Native Dialog & Scroll Containment Styling */
+dialog:modal {
+  overscroll-behavior: contain;
+}
+
 dialog::backdrop {
   background: rgba(11, 15, 25, 0.6);
   backdrop-filter: blur(4px);
+  overflow: hidden;
+  overscroll-behavior: contain;
 }
 
 /* Custom Scrollbars */

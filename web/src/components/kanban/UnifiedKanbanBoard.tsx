@@ -1,19 +1,57 @@
 import React, { useState } from 'react';
 import { Project, ProjectTask, ProjectTaskStatus } from '../../types/sams';
+import { IconCheck, IconGripVertical, IconKanban, IconTrash } from '../ui/Icons';
 
 interface UnifiedKanbanBoardProps {
   projects: Project[];
   onUpdateTaskStatus: (projectId: string, taskId: string, newStatus: ProjectTaskStatus) => void;
-  onAddTask: (projectId: string, title: string, status?: ProjectTaskStatus) => void;
+  onAddTask: (
+    projectId: string,
+    title: string,
+    status?: ProjectTaskStatus,
+    priority?: 'low' | 'medium' | 'high'
+  ) => void;
   onDeleteTask: (projectId: string, taskId: string) => void;
 }
 
-const COLUMNS: { id: ProjectTaskStatus; label: string; icon: string; color: string }[] = [
-  { id: 'backlog', label: 'Backlog', icon: '○', color: 'border-slate-400/40 text-slate-500' },
-  { id: 'in_progress', label: 'In Progress', icon: '◐', color: 'border-blue/40 text-blue' },
-  { id: 'review', label: 'Review', icon: '◑', color: 'border-amber-500/40 text-amber-500' },
-  { id: 'done', label: 'Done', icon: '●', color: 'border-emerald-500/40 text-emerald-500' },
+const COLUMNS: {
+  id: ProjectTaskStatus;
+  label: string;
+  dotColor: string;
+  topBorder: string;
+}[] = [
+  {
+    id: 'backlog',
+    label: 'Backlog',
+    dotColor: 'bg-slate-400',
+    topBorder: 'border-t-2 border-t-slate-400/60',
+  },
+  {
+    id: 'in_progress',
+    label: 'In Progress',
+    dotColor: 'bg-blue',
+    topBorder: 'border-t-2 border-t-blue',
+  },
+  {
+    id: 'review',
+    label: 'Review',
+    dotColor: 'bg-amber-500',
+    topBorder: 'border-t-2 border-t-amber-500',
+  },
+  {
+    id: 'done',
+    label: 'Done',
+    dotColor: 'bg-emerald-500',
+    topBorder: 'border-t-2 border-t-emerald-500',
+  },
 ];
+
+const STATUS_LABELS: Record<ProjectTaskStatus, string> = {
+  backlog: 'Backlog',
+  in_progress: 'In Progress',
+  review: 'Review',
+  done: 'Done',
+};
 
 export const UnifiedKanbanBoard: React.FC<UnifiedKanbanBoardProps> = ({
   projects,
@@ -24,9 +62,16 @@ export const UnifiedKanbanBoard: React.FC<UnifiedKanbanBoardProps> = ({
   const [selectedProjectFilter, setSelectedProjectFilter] = useState<string>('all');
   const [isAddingTask, setIsAddingTask] = useState<ProjectTaskStatus | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [newTaskPriority, setNewTaskPriority] = useState<'low' | 'medium' | 'high'>('medium');
   const [newTaskProjectId, setNewTaskProjectId] = useState<string>(
     projects.length > 0 ? projects[0].id : ''
   );
+
+  // Drag and Drop State
+  const [draggedTask, setDraggedTask] = useState<{ projectId: string; taskId: string } | null>(
+    null
+  );
+  const [dragOverColumn, setDragOverColumn] = useState<ProjectTaskStatus | null>(null);
 
   // Collect all tasks across all projects
   const allTasksWithProject: Array<ProjectTask & { projectName: string; projectId: string }> = [];
@@ -42,15 +87,23 @@ export const UnifiedKanbanBoard: React.FC<UnifiedKanbanBoardProps> = ({
     }
   }
 
+  const totalCount = allTasksWithProject.length;
+  const doneCount = allTasksWithProject.filter((t) => t.status === 'done').length;
+
   const handleCreateTask = (e: React.FormEvent, status: ProjectTaskStatus) => {
     e.preventDefault();
-    if (!newTaskTitle.trim() || !newTaskProjectId) return;
-    onAddTask(newTaskProjectId, newTaskTitle.trim(), status);
+    const targetProjectId = newTaskProjectId || (projects.length > 0 ? projects[0].id : '');
+    if (!newTaskTitle.trim() || !targetProjectId) return;
+    onAddTask(targetProjectId, newTaskTitle.trim(), status, newTaskPriority);
     setNewTaskTitle('');
+    setNewTaskPriority('medium');
     setIsAddingTask(null);
   };
 
-  const getNextStatus = (current: ProjectTaskStatus, direction: 'next' | 'prev'): ProjectTaskStatus | null => {
+  const getNextStatus = (
+    current: ProjectTaskStatus,
+    direction: 'next' | 'prev'
+  ): ProjectTaskStatus | null => {
     const order: ProjectTaskStatus[] = ['backlog', 'in_progress', 'review', 'done'];
     const idx = order.indexOf(current);
     if (direction === 'next' && idx < order.length - 1) return order[idx + 1];
@@ -71,23 +124,28 @@ export const UnifiedKanbanBoard: React.FC<UnifiedKanbanBoardProps> = ({
   return (
     <div className="rounded-2xl border border-line bg-surface p-5 sm:p-6 shadow-xs space-y-5">
       {/* Kanban Header & Project Filter Pills */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-line">
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-3.5 border-b border-line">
         <div className="flex items-center gap-3">
-          <div className="w-7 h-7 rounded-lg bg-blue/10 text-blue flex items-center justify-center font-bold text-sm">
-            ☷
+          <div className="w-8 h-8 rounded-xl bg-blue/10 border border-blue/20 text-blue flex items-center justify-center">
+            <IconKanban className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-ink tracking-tight">
-              Unified Project Kanban
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-bold text-ink tracking-tight">
+                Unified Project Kanban
+              </h2>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-elevated border border-line text-ink-muted font-semibold">
+                {doneCount}/{totalCount} shipped
+              </span>
+            </div>
             <p className="text-xs text-ink-muted">
-              Global delivery board tracking deliverables across all active codebases.
+              Drag and drop cards across columns or use quick-advance buttons to update delivery status.
             </p>
           </div>
         </div>
 
         {/* Project Switcher Filter */}
-        <div className="flex flex-wrap items-center gap-1.5 bg-elevated/70 p-1 rounded-xl border border-line text-xs font-mono">
+        <div className="flex flex-wrap items-center gap-1 bg-elevated/70 p-1 rounded-xl border border-line text-xs font-mono">
           <button
             type="button"
             onClick={() => setSelectedProjectFilter('all')}
@@ -104,7 +162,7 @@ export const UnifiedKanbanBoard: React.FC<UnifiedKanbanBoardProps> = ({
               key={p.id}
               type="button"
               onClick={() => setSelectedProjectFilter(p.id)}
-              className={`px-2.5 py-1 rounded-lg cursor-pointer transition-colors truncate max-w-[140px] ${
+              className={`px-2.5 py-1 rounded-lg cursor-pointer transition-colors truncate max-w-[150px] ${
                 selectedProjectFilter === p.id
                   ? 'bg-surface text-blue font-bold shadow-2xs'
                   : 'text-ink-muted hover:text-ink'
@@ -120,16 +178,38 @@ export const UnifiedKanbanBoard: React.FC<UnifiedKanbanBoardProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {COLUMNS.map((col) => {
           const colTasks = allTasksWithProject.filter((t) => t.status === col.id);
+          const isDropTarget = dragOverColumn === col.id;
 
           return (
             <div
               key={col.id}
-              className="rounded-xl border border-line/80 bg-canvas/60 p-3.5 flex flex-col gap-3 min-h-[380px]"
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (dragOverColumn !== col.id) setDragOverColumn(col.id);
+              }}
+              onDragLeave={() => {
+                if (dragOverColumn === col.id) setDragOverColumn(null);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOverColumn(null);
+                if (draggedTask) {
+                  onUpdateTaskStatus(draggedTask.projectId, draggedTask.taskId, col.id);
+                  setDraggedTask(null);
+                }
+              }}
+              className={`rounded-xl border transition-all p-3.5 flex flex-col gap-3 min-h-[380px] ${
+                col.topBorder
+              } ${
+                isDropTarget
+                  ? 'border-blue bg-blue/5 ring-2 ring-blue/20'
+                  : 'border-line/80 bg-canvas/50'
+              }`}
             >
               {/* Column Header */}
               <div className="flex items-center justify-between pb-2 border-b border-line">
-                <div className="flex items-center gap-1.5">
-                  <span className={`text-xs font-bold ${col.color}`}>{col.icon}</span>
+                <div className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${col.dotColor}`} />
                   <span className="text-xs font-bold text-ink uppercase tracking-wider">
                     {col.label}
                   </span>
@@ -139,9 +219,15 @@ export const UnifiedKanbanBoard: React.FC<UnifiedKanbanBoardProps> = ({
                 </div>
                 <button
                   type="button"
-                  onClick={() => setIsAddingTask(col.id)}
-                  className="text-xs font-bold text-blue hover:opacity-80 cursor-pointer p-0.5"
+                  onClick={() => {
+                    if (projects.length > 0 && !newTaskProjectId) {
+                      setNewTaskProjectId(projects[0].id);
+                    }
+                    setIsAddingTask(isAddingTask === col.id ? null : col.id);
+                  }}
+                  className="w-6 h-6 rounded-md bg-surface border border-line text-ink-muted hover:text-blue hover:border-blue/40 transition-colors cursor-pointer flex items-center justify-center text-xs font-bold"
                   title={`Add task to ${col.label}`}
+                  aria-label={`Add task to ${col.label}`}
                 >
                   +
                 </button>
@@ -151,7 +237,7 @@ export const UnifiedKanbanBoard: React.FC<UnifiedKanbanBoardProps> = ({
               {isAddingTask === col.id && (
                 <form
                   onSubmit={(e) => handleCreateTask(e, col.id)}
-                  className="p-2.5 rounded-xl bg-surface border border-line shadow-xs space-y-2 animate-fade-in"
+                  className="p-2.5 rounded-xl bg-surface border border-line shadow-xs space-y-2"
                 >
                   <input
                     type="text"
@@ -159,14 +245,15 @@ export const UnifiedKanbanBoard: React.FC<UnifiedKanbanBoardProps> = ({
                     required
                     value={newTaskTitle}
                     onChange={(e) => setNewTaskTitle(e.target.value)}
-                    placeholder="Task title..."
+                    placeholder="Deliverable title..."
                     className="w-full rounded-lg border border-line bg-canvas px-2.5 py-1.5 text-xs text-ink placeholder:text-ink-subtle focus:border-blue focus:outline-none"
                   />
-                  <div className="flex items-center justify-between gap-1.5">
+                  <div className="flex items-center gap-1.5">
                     <select
                       value={newTaskProjectId}
                       onChange={(e) => setNewTaskProjectId(e.target.value)}
-                      className="flex-1 rounded-lg border border-line bg-canvas px-1.5 py-1 text-[11px] text-ink focus:outline-none"
+                      aria-label="Select project"
+                      className="flex-1 min-w-0 rounded-lg border border-line bg-canvas px-1.5 py-1 text-[11px] text-ink focus:outline-none truncate"
                     >
                       {projects.map((p) => (
                         <option key={p.id} value={p.id}>
@@ -174,84 +261,125 @@ export const UnifiedKanbanBoard: React.FC<UnifiedKanbanBoardProps> = ({
                         </option>
                       ))}
                     </select>
+                    <select
+                      value={newTaskPriority}
+                      onChange={(e) => setNewTaskPriority(e.target.value as any)}
+                      aria-label="Select priority"
+                      className="rounded-lg border border-line bg-canvas px-1.5 py-1 text-[11px] text-ink focus:outline-none"
+                    >
+                      <option value="high">High</option>
+                      <option value="medium">Med</option>
+                      <option value="low">Low</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center justify-end gap-1.5 pt-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingTask(null)}
+                      className="px-2 py-1 rounded-lg bg-elevated text-[11px] text-ink-muted hover:text-ink cursor-pointer"
+                    >
+                      Cancel
+                    </button>
                     <button
                       type="submit"
                       className="px-2.5 py-1 rounded-lg bg-blue text-[11px] font-semibold text-white hover:opacity-95 cursor-pointer shadow-2xs"
                     >
-                      Add
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsAddingTask(null)}
-                      className="px-1.5 py-1 rounded-lg bg-elevated text-[11px] text-ink-muted hover:text-ink cursor-pointer"
-                    >
-                      ✕
+                      Add Card
                     </button>
                   </div>
                 </form>
               )}
 
               {/* Cards List */}
-              <div className="space-y-2.5 flex-1 overflow-y-auto max-h-[500px] pr-1">
+              <div className="space-y-2.5 flex-1 overflow-y-auto max-h-[480px] pr-0.5">
                 {colTasks.length === 0 ? (
-                  <div className="h-28 border border-dashed border-line/60 rounded-xl flex items-center justify-center text-[11px] text-ink-muted italic">
-                    No tasks in {col.label.toLowerCase()}
+                  <div className="h-32 border border-dashed border-line/60 rounded-xl flex flex-col items-center justify-center text-[11px] text-ink-muted italic gap-1">
+                    <span>Drop card here</span>
+                    <span className="text-[10px] text-ink-subtle not-italic">
+                      or click + to add to {col.label}
+                    </span>
                   </div>
                 ) : (
                   colTasks.map((task) => {
                     const prevStatus = getNextStatus(task.status, 'prev');
                     const nextStatus = getNextStatus(task.status, 'next');
+                    const isDragging =
+                      draggedTask?.taskId === task.id && draggedTask?.projectId === task.projectId;
 
                     return (
                       <div
                         key={task.id}
-                        className="rounded-xl border border-line bg-surface p-3.5 shadow-xs hover:border-blue/40 transition-all space-y-2 group relative"
+                        draggable
+                        onDragStart={(e) => {
+                          setDraggedTask({ projectId: task.projectId, taskId: task.id });
+                          e.dataTransfer.effectAllowed = 'move';
+                        }}
+                        onDragEnd={() => {
+                          setDraggedTask(null);
+                          setDragOverColumn(null);
+                        }}
+                        className={`rounded-xl border border-line bg-surface p-3 shadow-xs hover:border-blue/40 transition-all space-y-2 group relative cursor-grab active:cursor-grabbing ${
+                          isDragging ? 'opacity-40 scale-95 border-blue' : ''
+                        }`}
                       >
-                        {/* Project Pill & Priority */}
+                        {/* Top Bar: Drag Grip, Project Pill, Priority & Delete */}
                         <div className="flex items-center justify-between gap-1.5">
-                          <span
-                            className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-semibold border ${getProjectColor(
-                              task.projectId
-                            )}`}
-                          >
-                            {task.projectName}
-                          </span>
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1 min-w-0">
+                            <span
+                              className="text-ink-subtle group-hover:text-ink-muted transition-colors shrink-0"
+                              title="Drag to move column"
+                            >
+                              <IconGripVertical className="w-3 h-3" />
+                            </span>
+                            <span
+                              className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-semibold border truncate ${getProjectColor(
+                                task.projectId
+                              )}`}
+                            >
+                              {task.projectName}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1 shrink-0">
                             {task.priority === 'high' && (
-                              <span className="text-[9px] font-mono font-bold uppercase text-amber-500 bg-amber-500/10 px-1.5 py-0.2 rounded">
+                              <span className="text-[9px] font-mono font-bold uppercase text-amber-500 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.2 rounded">
                                 High
                               </span>
                             )}
                             <button
                               type="button"
                               onClick={() => onDeleteTask(task.projectId, task.id)}
-                              className="opacity-0 group-hover:opacity-100 text-[10px] text-ink-muted hover:text-red-500 transition-opacity cursor-pointer p-0.5"
+                              className="opacity-0 group-hover:opacity-100 w-5 h-5 rounded hover:bg-red-500/10 text-ink-muted hover:text-red-500 transition-opacity cursor-pointer flex items-center justify-center"
                               title="Delete task"
+                              aria-label="Delete task"
                             >
-                              ✕
+                              <IconTrash className="w-3 h-3" />
                             </button>
                           </div>
                         </div>
 
                         {/* Title */}
                         <h4
-                          className={`text-xs font-semibold leading-relaxed ${
+                          className={`text-xs font-semibold leading-snug ${
                             task.status === 'done' ? 'line-through text-ink-muted' : 'text-ink'
                           }`}
                         >
                           {task.title.replace(/\*\*/g, '')}
                         </h4>
 
-                        {/* Navigation Chevron Buttons (Move Left / Right) */}
-                        <div className="flex items-center justify-between pt-1 border-t border-line/50 text-[10px] font-mono text-ink-muted">
+                        {/* Footer: Clean Human-Readable Status Transition Buttons */}
+                        <div className="flex items-center justify-between pt-1.5 border-t border-line/50 text-[10px] font-mono text-ink-muted">
                           {prevStatus ? (
                             <button
                               type="button"
-                              onClick={() => onUpdateTaskStatus(task.projectId, task.id, prevStatus)}
-                              className="px-1.5 py-0.5 rounded hover:bg-elevated hover:text-ink transition-colors cursor-pointer flex items-center gap-0.5"
-                              title={`Move back to ${prevStatus}`}
+                              onClick={() =>
+                                onUpdateTaskStatus(task.projectId, task.id, prevStatus)
+                              }
+                              className="px-1.5 py-0.5 rounded hover:bg-elevated hover:text-ink transition-colors cursor-pointer flex items-center gap-1"
+                              title={`Move back to ${STATUS_LABELS[prevStatus]}`}
                             >
-                              ← {prevStatus}
+                              <span>←</span>
+                              <span>{STATUS_LABELS[prevStatus]}</span>
                             </button>
                           ) : (
                             <span />
@@ -260,14 +388,20 @@ export const UnifiedKanbanBoard: React.FC<UnifiedKanbanBoardProps> = ({
                           {nextStatus ? (
                             <button
                               type="button"
-                              onClick={() => onUpdateTaskStatus(task.projectId, task.id, nextStatus)}
-                              className="px-2 py-0.5 rounded bg-blue/10 text-blue hover:bg-blue hover:text-white transition-colors cursor-pointer flex items-center gap-0.5 font-semibold"
-                              title={`Advance to ${nextStatus}`}
+                              onClick={() =>
+                                onUpdateTaskStatus(task.projectId, task.id, nextStatus)
+                              }
+                              className="px-2 py-0.5 rounded-md bg-blue/10 text-blue hover:bg-blue hover:text-white transition-colors cursor-pointer flex items-center gap-1 font-semibold"
+                              title={`Advance to ${STATUS_LABELS[nextStatus]}`}
                             >
-                              {nextStatus} →
+                              <span>{STATUS_LABELS[nextStatus]}</span>
+                              <span>→</span>
                             </button>
                           ) : (
-                            <span className="text-emerald-500 font-bold">✓ Completed</span>
+                            <span className="text-emerald-500 font-semibold flex items-center gap-1">
+                              <IconCheck className="w-3 h-3" />
+                              <span>Done</span>
+                            </span>
                           )}
                         </div>
                       </div>

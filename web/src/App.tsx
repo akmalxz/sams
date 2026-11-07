@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import {
   Project,
   ProjectTask,
@@ -18,6 +18,14 @@ import { MarkdownNoteDrawer } from './components/secondbrain/MarkdownNoteDrawer'
 import { LinkProjectDialog } from './components/projects/LinkProjectDialog';
 import { ReanalyzeProjectModal } from './components/projects/ReanalyzeProjectModal';
 import { ThreeBotCanvas, BotMood } from './components/bot/ThreeBotCanvas';
+import {
+  IconArchiveBox,
+  IconClose,
+  IconCompass,
+  IconFolderCode,
+  IconKanban,
+  IconSearch,
+} from './components/ui/Icons';
 
 export function App() {
   // Theme Management (White + SAMS Blue vs Deep Slate)
@@ -57,15 +65,16 @@ export function App() {
         isGitRepo: true,
         branch: 'main',
         uncommittedChanges: 0,
-        lastCommitHash: 'b5252b6',
-        lastCommitMessage: 'feat(layout): implement Projects | Learn | To do tri-split and Unified Cross-Project Kanban Board',
+        lastCommitHash: 'a919628',
+        lastCommitMessage:
+          'feat(second-brain): complete P.A.R.A. Second Brain with Areas and Archives views',
         remoteUrl: 'https://github.com/akmalxz/sams.git',
       },
       tasks: [
         {
           id: 't-1',
           projectId: 'personal-ai-platform',
-          title: 'Split layout into Projects | Learn | To do',
+          title: 'Split layout into Projects | Learn | To do Bento Deck',
           status: 'done',
           priority: 'high',
           createdAt: Date.now(),
@@ -74,7 +83,7 @@ export function App() {
         {
           id: 't-2',
           projectId: 'personal-ai-platform',
-          title: 'Implement Unified Cross-Project Kanban Board',
+          title: 'Implement Unified Cross-Project Drag-and-Drop Kanban',
           status: 'done',
           priority: 'high',
           createdAt: Date.now(),
@@ -83,7 +92,7 @@ export function App() {
         {
           id: 't-3',
           projectId: 'personal-ai-platform',
-          title: 'Implement Full P.A.R.A. Second Brain with Markdown Drawer & Archives',
+          title: 'Add ⌘K Global Search & Split-Preview Markdown Drawer',
           status: 'in_progress',
           priority: 'high',
           createdAt: Date.now(),
@@ -155,7 +164,7 @@ export function App() {
     {
       id: 'l-2',
       title: 'Auto-Enablement on configure-pages Action',
-      note: "Set enablement: true on actions/configure-pages@v5 to avoid HttpError 404 when activating Pages.",
+      note: 'Set enablement: true on actions/configure-pages@v5 to avoid HttpError 404 when activating Pages.',
       content: `# Auto-Enablement on configure-pages Action\n\nWhen setting up GitHub Actions for GitHub Pages on a newly created repository, the Pages site API resource may not exist yet.\n\n### The Fix\nPass \`enablement: true\` in \`.github/workflows/deploy.yml\`:\n\`\`\`yaml\n- name: Setup Pages\n  uses: actions/configure-pages@v5\n  with:\n    enablement: true\n\`\`\`\nThis tells GitHub Actions to activate Pages automatically via the GitHub REST API!`,
       category: 'bugfix',
       projectName: 'DevOps',
@@ -173,9 +182,27 @@ export function App() {
   ];
 
   const DEFAULT_TODOS: QuickTodoItem[] = [
-    { id: 'todo-1', text: 'Review 3-column Projects | Learn | To do layout', completed: true, priority: 'normal', createdAt: Date.now() },
-    { id: 'todo-2', text: 'Verify cross-project Kanban board task transitions', completed: true, priority: 'urgent', createdAt: Date.now() },
-    { id: 'todo-3', text: 'Explore P.A.R.A. Areas of Responsibility & Archives view', completed: false, priority: 'urgent', createdAt: Date.now() },
+    {
+      id: 'todo-1',
+      text: 'Review 3-column Projects | Learn | To do Bento symmetry',
+      completed: true,
+      priority: 'normal',
+      createdAt: Date.now(),
+    },
+    {
+      id: 'todo-2',
+      text: 'Verify drag-and-drop Kanban board task transitions',
+      completed: true,
+      priority: 'urgent',
+      createdAt: Date.now(),
+    },
+    {
+      id: 'todo-3',
+      text: 'Test ⌘K Global Search & Split-Preview Markdown Drawer',
+      completed: false,
+      priority: 'urgent',
+      createdAt: Date.now(),
+    },
   ];
 
   const DEFAULT_AREAS: AreaOfResponsibility[] = [
@@ -186,8 +213,8 @@ export function App() {
       description: 'GitHub Actions, GitHub Pages deployment, DNS, and serverless hosting.',
       standards: [
         "Always set base: './' in Vite config for GitHub Pages subpath deployment.",
-        "Include enablement: true on actions/configure-pages@v5 for auto-activation.",
-        "Keep build steps isolated so web builds pass without network access when sandboxed.",
+        'Include enablement: true on actions/configure-pages@v5 for auto-activation.',
+        'Keep build steps isolated so web builds pass without network access when sandboxed.',
       ],
       color: '#3B82F6',
     },
@@ -211,7 +238,7 @@ export function App() {
       standards: [
         'Conserve battery and memory by pausing requestAnimationFrame on document.hidden.',
         'Maintain crisp dual themes (White+Blue light mode and Deep Slate dark mode).',
-        'Use native HTML5 <dialog> with backdrop dismiss and Esc accessibility.',
+        'Use native HTML5 <dialog> with closedby="any" and overscroll-behavior: contain.',
       ],
       color: '#10B981',
     },
@@ -247,6 +274,9 @@ export function App() {
 
   // --- Second Brain State (P.A.R.A.) ---
   const [activeParaTab, setActiveParaTab] = useState<'deck' | 'areas' | 'archives'>('deck');
+  const [globalSearchQuery, setGlobalSearchQuery] = useState('');
+  const [activeProjectDeckFilter, setActiveProjectDeckFilter] = useState<string>('all');
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   const [projects, setProjects] = useState<Project[]>(() => {
     try {
@@ -293,6 +323,18 @@ export function App() {
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
   const [reanalyzingProject, setReanalyzingProject] = useState<Project | null>(null);
 
+  // Global keyboard shortcut Cmd+K / Ctrl+K to focus Second-Brain search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   // Fetch Projects from Backend (with fallback to localStorage/demo)
   const fetchProjects = async () => {
     try {
@@ -318,6 +360,39 @@ export function App() {
     const interval = setInterval(fetchProjects, 4000);
     return () => clearInterval(interval);
   }, []);
+
+  // --- Filtered Collections via Global Search ---
+  const normalizedQuery = globalSearchQuery.trim().toLowerCase();
+
+  const filteredProjects = useMemo(() => {
+    return projects.filter((p) => {
+      if (activeProjectDeckFilter !== 'all' && p.id !== activeProjectDeckFilter) return false;
+      if (!normalizedQuery) return true;
+      const inTitle = p.name.toLowerCase().includes(normalizedQuery);
+      const inFocus = (p.currentFocus || '').toLowerCase().includes(normalizedQuery);
+      const inRepo = (p.githubRepo || '').toLowerCase().includes(normalizedQuery);
+      const inTasks = (p.tasks || []).some((t) =>
+        t.title.toLowerCase().includes(normalizedQuery)
+      );
+      return inTitle || inFocus || inRepo || inTasks;
+    });
+  }, [projects, activeProjectDeckFilter, normalizedQuery]);
+
+  const filteredLearnings = useMemo(() => {
+    if (!normalizedQuery) return learnings;
+    return learnings.filter(
+      (l) =>
+        l.title.toLowerCase().includes(normalizedQuery) ||
+        l.note.toLowerCase().includes(normalizedQuery) ||
+        (l.projectName || '').toLowerCase().includes(normalizedQuery) ||
+        l.category.toLowerCase().includes(normalizedQuery)
+    );
+  }, [learnings, normalizedQuery]);
+
+  const filteredTodos = useMemo(() => {
+    if (!normalizedQuery) return todos;
+    return todos.filter((t) => t.text.toLowerCase().includes(normalizedQuery));
+  }, [todos, normalizedQuery]);
 
   // --- Task & Project Handlers ---
   const handleToggleTask = async (projectId: string, task: ProjectTask) => {
@@ -385,13 +460,14 @@ export function App() {
   const handleAddTask = async (
     projectId: string,
     title: string,
-    status: ProjectTaskStatus = 'backlog'
+    status: ProjectTaskStatus = 'backlog',
+    priority: 'low' | 'medium' | 'high' = 'medium'
   ) => {
     const newTask: ProjectTask = {
       id: `task-${Date.now()}`,
       projectId,
       title,
-      priority: 'medium',
+      priority,
       status,
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -413,7 +489,7 @@ export function App() {
         await fetch(`/api/projects/${projectId}/tasks`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title, priority: 'medium', status }),
+          body: JSON.stringify({ title, priority, status }),
         });
       } catch (err) {
         console.error('Failed to create task on backend:', err);
@@ -518,7 +594,9 @@ export function App() {
     const doneTasks = (project.tasks || []).filter((t) => t.status === 'done');
     const accomplishments = doneTasks.map((t) => t.title.replace(/\*\*/g, ''));
     if (project.git?.lastCommitMessage) {
-      accomplishments.unshift(`${project.git.lastCommitMessage} (${project.git.lastCommitHash || 'HEAD'})`);
+      accomplishments.unshift(
+        `${project.git.lastCommitMessage} (${project.git.lastCommitHash || 'HEAD'})`
+      );
     }
 
     const archivedItem: ArchivedProject = {
@@ -644,7 +722,7 @@ export function App() {
       (projects.length > 0 ? projects[0] : null);
 
     if (targetProject) {
-      handleAddTask(targetProject.id, `Apply learning: ${title}`, 'backlog');
+      handleAddTask(targetProject.id, `Apply learning: ${title}`, 'backlog', 'medium');
     }
   };
 
@@ -713,37 +791,47 @@ export function App() {
     });
   };
 
-  // Derive Bot Mood & Status Message
+  // Derive Bot Mood, Global Velocity & Status Message
   const botTelemetry = useMemo(() => {
+    const totalTasks = projects.reduce((acc, p) => acc + (p.tasks?.length || 0), 0);
+    const doneTasks = projects.reduce(
+      (acc, p) => acc + (p.tasks?.filter((t) => t.status === 'done').length || 0),
+      0
+    );
+    const velocityPct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
+
     if (projects.length === 0) {
       return {
         mood: 'focus' as BotMood,
+        velocityPct: 0,
+        doneTasks: 0,
+        totalTasks: 0,
         message: 'Second Brain initialized. Click "+ Link Project" to track your codebases.',
       };
     }
 
-    const dirtyProjects = projects.filter(
-      (p) => (p.git?.uncommittedChanges ?? 0) > 0
-    );
-    const totalOpenTasks = projects.reduce(
-      (acc, p) => acc + (p.tasks?.filter((t) => t.status !== 'done').length || 0),
-      0
-    );
+    const dirtyProjects = projects.filter((p) => (p.git?.uncommittedChanges ?? 0) > 0);
 
     if (dirtyProjects.length > 0) {
       return {
         mood: 'dirty' as BotMood,
-        message: `Second Brain: ${projects.length} active projects, ${areas.length} areas of standard, ${archives.length} archived retrospectives.`,
+        velocityPct,
+        doneTasks,
+        totalTasks,
+        message: `${dirtyProjects.length} workspace has uncommitted changes. ${doneTasks}/${totalTasks} deliverables shipped across ${projects.length} projects.`,
       };
     }
 
     return {
       mood: 'clean' as BotMood,
+      velocityPct,
+      doneTasks,
+      totalTasks,
       message: backendOnline
-        ? `Live Second Brain: All ${projects.length} codebases clean & synced! ${learnings.length} resource notes documented.`
-        : `Cloud Second Brain: P.A.R.A. active with 3D SAM. Syncing real-time commits via GitHub API!`,
+        ? `Live Second Brain: ${projects.length} codebases clean & synced · ${learnings.length} technical notes indexed.`
+        : `Cloud Second Brain: ${projects.length} repositories active · ${doneTasks}/${totalTasks} deliverables completed (${velocityPct}%).`,
     };
-  }, [projects, backendOnline, areas.length, archives.length, learnings.length]);
+  }, [projects, backendOnline, learnings.length]);
 
   return (
     <div className="min-h-screen bg-canvas text-ink font-sans transition-colors duration-200 flex flex-col">
@@ -751,7 +839,7 @@ export function App() {
       <header className="border-b border-line bg-surface/90 backdrop-blur-md px-5 py-2.5 sticky top-0 z-30 flex items-center justify-between gap-4">
         {/* Brand */}
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-blue/10 border border-blue/20 flex items-center justify-center text-blue shadow-xs font-bold text-sm">
+          <div className="w-8 h-8 rounded-xl bg-blue text-white flex items-center justify-center shadow-xs font-bold text-sm">
             ✦
           </div>
           <div>
@@ -767,45 +855,51 @@ export function App() {
           </div>
         </div>
 
-        {/* Center: P.A.R.A. Navigation Switcher */}
-        <div className="hidden md:flex items-center gap-1 bg-elevated/70 p-1 rounded-xl border border-line text-xs font-mono">
+        {/* Center: Primary P.A.R.A. Navigation Switcher */}
+        <nav
+          aria-label="P.A.R.A. Views"
+          className="hidden md:flex items-center gap-1 bg-elevated/70 p-1 rounded-xl border border-line text-xs font-mono"
+        >
           <button
             type="button"
             onClick={() => setActiveParaTab('deck')}
-            className={`px-3 py-1 rounded-lg cursor-pointer transition-colors ${
+            className={`px-3 py-1.5 rounded-lg cursor-pointer transition-colors flex items-center gap-1.5 ${
               activeParaTab === 'deck'
                 ? 'bg-surface text-ink font-bold shadow-2xs'
                 : 'text-ink-muted hover:text-ink'
             }`}
           >
-            ☷ Command Deck
+            <IconKanban className="w-3.5 h-3.5 text-blue" />
+            <span>Command Deck</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveParaTab('areas')}
-            className={`px-3 py-1 rounded-lg cursor-pointer transition-colors ${
+            className={`px-3 py-1.5 rounded-lg cursor-pointer transition-colors flex items-center gap-1.5 ${
               activeParaTab === 'areas'
                 ? 'bg-surface text-purple-600 dark:text-purple-400 font-bold shadow-2xs'
                 : 'text-ink-muted hover:text-ink'
             }`}
           >
-            🌐 Areas ({areas.length})
+            <IconCompass className="w-3.5 h-3.5 text-purple-500" />
+            <span>Areas ({areas.length})</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveParaTab('archives')}
-            className={`px-3 py-1 rounded-lg cursor-pointer transition-colors ${
+            className={`px-3 py-1.5 rounded-lg cursor-pointer transition-colors flex items-center gap-1.5 ${
               activeParaTab === 'archives'
                 ? 'bg-surface text-emerald-600 dark:text-emerald-400 font-bold shadow-2xs'
                 : 'text-ink-muted hover:text-ink'
             }`}
           >
-            📦 Archives ({archives.length})
+            <IconArchiveBox className="w-3.5 h-3.5 text-emerald-500" />
+            <span>Archives ({archives.length})</span>
           </button>
-        </div>
+        </nav>
 
         {/* Right Toolbar */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           {/* Backend Connection Indicator */}
           <div
             className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono border ${
@@ -828,7 +922,7 @@ export function App() {
           <button
             type="button"
             onClick={() => setIsLinkDialogOpen(true)}
-            className="px-3.5 py-1.5 rounded-xl bg-blue text-white text-xs font-semibold hover:opacity-95 transition-opacity cursor-pointer flex items-center gap-1.5 shadow-sm"
+            className="px-3.5 py-1.5 rounded-xl bg-blue text-white text-xs font-semibold hover:opacity-95 transition-opacity cursor-pointer flex items-center gap-1.5 shadow-xs"
           >
             <span>+</span> Link Project
           </button>
@@ -842,7 +936,14 @@ export function App() {
             title={themeMode === 'dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
           >
             {themeMode === 'dark' ? (
-              <svg className="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg
+                aria-hidden="true"
+                className="w-4 h-4 text-amber-400"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
                 <circle cx="12" cy="12" r="5" />
                 <line x1="12" y1="1" x2="12" y2="3" />
                 <line x1="12" y1="21" x2="12" y2="23" />
@@ -854,7 +955,14 @@ export function App() {
                 <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
               </svg>
             ) : (
-              <svg className="w-4 h-4 text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg
+                aria-hidden="true"
+                className="w-4 h-4 text-slate-700"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
                 <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
               </svg>
             )}
@@ -864,23 +972,20 @@ export function App() {
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
-        {/* Executive 3D SAM Companion Banner */}
-        <div className="p-4 rounded-2xl bg-surface border border-line shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-4 w-full sm:w-auto">
+        {/* Executive 3D SAM Companion & Global Second-Brain Search Banner */}
+        <div className="p-4 rounded-2xl bg-surface border border-line shadow-xs flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+          <div className="flex items-center gap-4 min-w-0">
             {/* 3D WebGL Canvas Container */}
-            <div className="w-20 h-20 sm:w-24 sm:h-24 shrink-0 rounded-2xl bg-canvas border border-line/60 relative overflow-hidden shadow-2xs">
-              <ThreeBotCanvas
-                mood={botTelemetry.mood}
-                isDark={themeMode === 'dark'}
-              />
+            <div className="w-18 h-18 sm:w-20 sm:h-20 shrink-0 rounded-2xl bg-canvas border border-line/60 relative overflow-hidden shadow-2xs">
+              <ThreeBotCanvas mood={botTelemetry.mood} isDark={themeMode === 'dark'} />
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-mono font-bold uppercase tracking-wider text-blue">
-                  SAM · 3D Agent Companion
+                  SAM · 3D Spatial Companion
                 </span>
-                <span className="text-[10px] font-mono px-2 py-0.2 rounded-full bg-blue/10 text-blue font-semibold border border-blue/20">
-                  Gaze Tracking
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue/10 text-blue font-semibold border border-blue/20">
+                  Interactive Gaze
                 </span>
               </div>
               <p className="text-xs sm:text-sm font-medium text-ink mt-1 leading-relaxed">
@@ -889,49 +994,53 @@ export function App() {
             </div>
           </div>
 
-          {/* Quick Metrics Pills */}
-          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center font-mono text-xs">
-            <button
-              type="button"
-              onClick={() => setActiveParaTab('deck')}
-              className={`px-3 py-1.5 rounded-xl border transition-colors text-center cursor-pointer ${
-                activeParaTab === 'deck' ? 'border-blue bg-blue/5' : 'border-line bg-canvas'
-              }`}
-            >
-              <span className="text-[10px] text-ink-muted uppercase block">Projects</span>
-              <span className="font-bold text-blue">{projects.length}</span>
-            </button>
+          {/* Right: Global Second-Brain Search (⌘K) + Global Delivery Velocity */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
+            {/* Global Search Input */}
+            <div className="relative flex items-center min-w-[260px] sm:min-w-[300px]">
+              <IconSearch className="w-4 h-4 text-ink-subtle absolute left-3 pointer-events-none" />
+              <input
+                ref={searchInputRef}
+                type="search"
+                value={globalSearchQuery}
+                onChange={(e) => setGlobalSearchQuery(e.target.value)}
+                placeholder="Search projects, notes, tasks..."
+                aria-label="Search across Second Brain"
+                className="w-full rounded-xl border border-line bg-canvas pl-9 pr-14 py-2 text-xs text-ink placeholder:text-ink-subtle focus:border-blue focus:outline-none transition-colors"
+              />
+              {globalSearchQuery ? (
+                <button
+                  type="button"
+                  onClick={() => setGlobalSearchQuery('')}
+                  aria-label="Clear search"
+                  className="absolute right-2.5 text-ink-muted hover:text-ink cursor-pointer p-0.5"
+                >
+                  <IconClose className="w-3.5 h-3.5" />
+                </button>
+              ) : (
+                <kbd className="hidden sm:inline-block absolute right-2.5 px-1.5 py-0.5 text-[10px] font-mono text-ink-subtle bg-surface border border-line rounded-md pointer-events-none">
+                  ⌘K
+                </kbd>
+              )}
+            </div>
 
-            <button
-              type="button"
-              onClick={() => setActiveParaTab('areas')}
-              className={`px-3 py-1.5 rounded-xl border transition-colors text-center cursor-pointer ${
-                activeParaTab === 'areas' ? 'border-purple-500 bg-purple-500/5' : 'border-line bg-canvas'
-              }`}
-            >
-              <span className="text-[10px] text-ink-muted uppercase block">Areas</span>
-              <span className="font-bold text-purple-500">{areas.length}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveParaTab('deck')}
-              className="px-3 py-1.5 rounded-xl border border-line bg-canvas text-center cursor-pointer"
-            >
-              <span className="text-[10px] text-ink-muted uppercase block">Resources</span>
-              <span className="font-bold text-ink">{learnings.length}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveParaTab('archives')}
-              className={`px-3 py-1.5 rounded-xl border transition-colors text-center cursor-pointer ${
-                activeParaTab === 'archives' ? 'border-emerald-500 bg-emerald-500/5' : 'border-line bg-canvas'
-              }`}
-            >
-              <span className="text-[10px] text-ink-muted uppercase block">Archives</span>
-              <span className="font-bold text-emerald-500">{archives.length}</span>
-            </button>
+            {/* Global Velocity Progress Pill */}
+            <div className="px-3.5 py-2 rounded-xl border border-line bg-canvas flex items-center gap-3">
+              <div>
+                <span className="text-[10px] font-mono uppercase tracking-wider text-ink-muted block">
+                  Global Velocity
+                </span>
+                <span className="text-xs font-mono font-bold text-ink">
+                  {botTelemetry.doneTasks}/{botTelemetry.totalTasks} Shipped ({botTelemetry.velocityPct}%)
+                </span>
+              </div>
+              <div className="w-12 bg-elevated rounded-full h-2 overflow-hidden border border-line/50">
+                <div
+                  className="bg-blue h-full rounded-full transition-all duration-300"
+                  style={{ width: `${botTelemetry.velocityPct}%` }}
+                />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -940,8 +1049,8 @@ export function App() {
           <button
             type="button"
             onClick={() => setActiveParaTab('deck')}
-            className={`flex-1 py-1 text-center rounded-lg ${
-              activeParaTab === 'deck' ? 'bg-surface text-ink font-bold' : 'text-ink-muted'
+            className={`flex-1 py-1.5 text-center rounded-lg ${
+              activeParaTab === 'deck' ? 'bg-surface text-ink font-bold shadow-2xs' : 'text-ink-muted'
             }`}
           >
             Deck
@@ -949,107 +1058,139 @@ export function App() {
           <button
             type="button"
             onClick={() => setActiveParaTab('areas')}
-            className={`flex-1 py-1 text-center rounded-lg ${
-              activeParaTab === 'areas' ? 'bg-surface text-purple-600 font-bold' : 'text-ink-muted'
+            className={`flex-1 py-1.5 text-center rounded-lg ${
+              activeParaTab === 'areas'
+                ? 'bg-surface text-purple-600 font-bold shadow-2xs'
+                : 'text-ink-muted'
             }`}
           >
-            Areas
+            Areas ({areas.length})
           </button>
           <button
             type="button"
             onClick={() => setActiveParaTab('archives')}
-            className={`flex-1 py-1 text-center rounded-lg ${
-              activeParaTab === 'archives' ? 'bg-surface text-emerald-600 font-bold' : 'text-ink-muted'
+            className={`flex-1 py-1.5 text-center rounded-lg ${
+              activeParaTab === 'archives'
+                ? 'bg-surface text-emerald-600 font-bold shadow-2xs'
+                : 'text-ink-muted'
             }`}
           >
-            Archives
+            Archives ({archives.length})
           </button>
         </div>
 
-        {/* --- VIEW 1: COMMAND DECK (P.A.R.A. Projects & Resources & Kanban) --- */}
+        {/* --- VIEW 1: COMMAND DECK (Symmetrical 3-Column Bento + Unified Kanban) --- */}
         {activeParaTab === 'deck' && (
           <div className="space-y-6">
-            {/* Top 3 Columns [ Projects (P) | Learn / Resources (R) | To do ] */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-              {/* 1. Projects Column */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between pb-2 border-b border-line">
+            {/* Top 3 Symmetrical Bento Columns [ Projects (P) | Learn / Resources (R) | To do ] */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+              {/* 1. Projects Bento Panel (Synchronized lg:h-[580px] container) */}
+              <div className="rounded-2xl border border-line bg-surface p-5 shadow-xs flex flex-col gap-3 lg:h-[580px]">
+                {/* Header */}
+                <div className="flex items-center justify-between pb-2.5 border-b border-line shrink-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-blue font-bold">🔷</span>
+                    <div className="w-6 h-6 rounded-lg bg-blue/10 border border-blue/20 text-blue flex items-center justify-center">
+                      <IconFolderCode className="w-3.5 h-3.5" />
+                    </div>
                     <h2 className="text-sm font-bold text-ink tracking-tight">Projects (P)</h2>
-                    <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-elevated border border-line text-ink-muted">
-                      {projects.length}
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-elevated border border-line text-ink-muted font-semibold">
+                      {filteredProjects.length}
                     </span>
                   </div>
                   <button
                     type="button"
                     onClick={() => setIsLinkDialogOpen(true)}
-                    className="text-xs font-semibold text-blue hover:underline cursor-pointer flex items-center gap-0.5"
+                    className="px-2.5 py-1 rounded-lg bg-blue/10 text-blue border border-blue/20 hover:bg-blue hover:text-white transition-colors text-xs font-semibold cursor-pointer flex items-center gap-1"
                   >
                     <span>+</span> Link
                   </button>
                 </div>
 
-                {projects.length === 0 ? (
-                  <div className="p-8 rounded-2xl border-2 border-dashed border-line text-center space-y-2">
-                    <p className="text-xs text-ink-muted">No projects tracked yet.</p>
+                {/* Project Quick-Isolate Filter Pills */}
+                <div className="flex items-center gap-1 overflow-x-auto pb-1 shrink-0 text-[10px] font-mono">
+                  <button
+                    type="button"
+                    onClick={() => setActiveProjectDeckFilter('all')}
+                    className={`px-2 py-0.5 rounded-md border transition-colors cursor-pointer shrink-0 ${
+                      activeProjectDeckFilter === 'all'
+                        ? 'bg-elevated border-blue/40 text-ink font-semibold'
+                        : 'bg-transparent border-transparent text-ink-muted hover:text-ink'
+                    }`}
+                  >
+                    All ({projects.length})
+                  </button>
+                  {projects.map((p) => (
                     <button
+                      key={p.id}
                       type="button"
-                      onClick={() => setIsLinkDialogOpen(true)}
-                      className="px-3 py-1.5 rounded-lg bg-blue text-white text-xs font-semibold shadow-xs"
+                      onClick={() => setActiveProjectDeckFilter(p.id)}
+                      className={`px-2 py-0.5 rounded-md border transition-colors cursor-pointer truncate max-w-[130px] shrink-0 ${
+                        activeProjectDeckFilter === p.id
+                          ? 'bg-elevated border-blue/40 text-blue font-semibold'
+                          : 'bg-transparent border-transparent text-ink-muted hover:text-ink'
+                      }`}
                     >
-                      Link First Project
+                      {p.name}
                     </button>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {projects.map((project) => (
+                  ))}
+                </div>
+
+                {/* Scrollable Project Cards */}
+                <div className="space-y-3 flex-1 overflow-y-auto pr-1 min-h-0">
+                  {filteredProjects.length === 0 ? (
+                    <div className="h-full min-h-[200px] rounded-xl border border-dashed border-line/70 flex flex-col items-center justify-center p-6 text-center gap-2">
+                      <IconFolderCode className="w-5 h-5 text-ink-subtle" />
+                      <p className="text-xs font-medium text-ink-muted">No matching projects</p>
+                      <button
+                        type="button"
+                        onClick={() => setIsLinkDialogOpen(true)}
+                        className="px-3 py-1.5 rounded-lg bg-blue text-white text-xs font-semibold shadow-xs cursor-pointer"
+                      >
+                        + Link Codebase
+                      </button>
+                    </div>
+                  ) : (
+                    filteredProjects.map((project) => (
                       <ProjectRadarCard
                         key={project.id}
                         project={project}
                         onToggleTask={handleToggleTask}
-                        onAddTask={handleAddTask}
+                        onAddTask={(id, title) => handleAddTask(id, title, 'backlog', 'medium')}
                         onUpdateFocus={handleUpdateFocus}
                         onSyncPulse={(p) => setReanalyzingProject(p)}
                         onUnlinkProject={handleUnlinkProject}
                         onArchiveProject={handleArchiveProject}
                         onUpdateProject={handleUpdateProject}
                       />
-                    ))}
-                  </div>
-                )}
+                    ))
+                  )}
+                </div>
               </div>
 
-              {/* 2. Learn / Resources Column */}
-              <div>
-                <LearnSection
-                  learnings={learnings}
-                  onAddLearning={handleAddLearning}
-                  onDeleteLearning={handleDeleteLearning}
-                  onSelectNote={(n) => setActiveNoteDrawer(n)}
-                />
-              </div>
+              {/* 2. Learn / Resources Bento Panel */}
+              <LearnSection
+                learnings={filteredLearnings}
+                onAddLearning={handleAddLearning}
+                onDeleteLearning={handleDeleteLearning}
+                onSelectNote={(n) => setActiveNoteDrawer(n)}
+              />
 
-              {/* 3. To do / Immediate Action Column */}
-              <div>
-                <QuickTodoSection
-                  todos={todos}
-                  onToggleTodo={handleToggleTodo}
-                  onAddTodo={handleAddTodo}
-                  onDeleteTodo={handleDeleteTodo}
-                />
-              </div>
+              {/* 3. To do / Daily Execution Bento Panel */}
+              <QuickTodoSection
+                todos={filteredTodos}
+                onToggleTodo={handleToggleTodo}
+                onAddTodo={handleAddTodo}
+                onDeleteTodo={handleDeleteTodo}
+              />
             </div>
 
             {/* Bottom: Unified Cross-Project Kanban Board */}
-            <div>
-              <UnifiedKanbanBoard
-                projects={projects}
-                onUpdateTaskStatus={handleUpdateTaskStatus}
-                onAddTask={handleAddTask}
-                onDeleteTask={handleDeleteTask}
-              />
-            </div>
+            <UnifiedKanbanBoard
+              projects={filteredProjects}
+              onUpdateTaskStatus={handleUpdateTaskStatus}
+              onAddTask={handleAddTask}
+              onDeleteTask={handleDeleteTask}
+            />
           </div>
         )}
 

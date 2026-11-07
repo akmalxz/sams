@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { QuickTodoItem } from '../../types/sams';
+import { IconCheckSquare, IconTrash } from '../ui/Icons';
 
 interface QuickTodoSectionProps {
   todos: QuickTodoItem[];
@@ -16,8 +17,16 @@ export const QuickTodoSection: React.FC<QuickTodoSectionProps> = ({
 }) => {
   const [newText, setNewText] = useState('');
   const [isUrgent, setIsUrgent] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'active' | 'urgent'>('all');
 
   const doneCount = todos.filter((t) => t.completed).length;
+  const pct = todos.length > 0 ? Math.round((doneCount / todos.length) * 100) : 0;
+
+  const filteredTodos = todos.filter((item) => {
+    if (filter === 'active') return !item.completed;
+    if (filter === 'urgent') return item.priority === 'urgent' && !item.completed;
+    return true;
+  });
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,39 +37,56 @@ export const QuickTodoSection: React.FC<QuickTodoSectionProps> = ({
   };
 
   return (
-    <div className="rounded-2xl border border-line bg-surface p-5 shadow-xs flex flex-col gap-3 h-full">
+    <div className="rounded-2xl border border-line bg-surface p-5 shadow-xs flex flex-col gap-3 lg:h-[580px]">
       {/* Header */}
-      <div className="flex items-center justify-between pb-2 border-b border-line">
+      <div className="flex items-center justify-between pb-2.5 border-b border-line shrink-0">
         <div className="flex items-center gap-2">
-          <span className="text-emerald-500 font-bold">☑</span>
+          <div className="w-6 h-6 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+            <IconCheckSquare className="w-3.5 h-3.5" />
+          </div>
           <h2 className="text-sm font-bold text-ink tracking-tight">To do</h2>
-          <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-elevated border border-line text-ink-muted">
+          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-elevated border border-line text-ink-muted font-semibold">
             {doneCount}/{todos.length}
           </span>
         </div>
-        <div className="text-[10px] font-mono text-ink-muted">
-          {todos.length > 0 ? `${Math.round((doneCount / todos.length) * 100)}% done` : 'Clean'}
+
+        <div className="flex items-center gap-1 text-[10px] font-mono">
+          {(['all', 'active', 'urgent'] as const).map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setFilter(f)}
+              className={`px-2 py-0.5 rounded-md capitalize transition-colors cursor-pointer ${
+                filter === f
+                  ? 'bg-elevated text-ink font-semibold border border-line'
+                  : 'text-ink-muted hover:text-ink'
+              }`}
+            >
+              {f}
+            </button>
+          ))}
         </div>
       </div>
 
       {/* Quick Add Input Form */}
-      <form onSubmit={handleAdd} className="flex gap-1.5 items-center">
+      <form onSubmit={handleAdd} className="flex gap-1.5 items-center shrink-0">
         <input
           type="text"
           value={newText}
           onChange={(e) => setNewText(e.target.value)}
-          placeholder="Quick action item for today..."
+          placeholder="Capture action item for today..."
           className="flex-1 rounded-xl border border-line bg-canvas px-3 py-2 text-xs text-ink placeholder:text-ink-subtle focus:border-blue focus:outline-none"
         />
         <button
           type="button"
           onClick={() => setIsUrgent(!isUrgent)}
-          className={`px-2 py-2 rounded-xl border text-xs font-bold cursor-pointer transition-colors ${
+          className={`px-2.5 py-2 rounded-xl border text-xs font-mono font-bold cursor-pointer transition-colors ${
             isUrgent
-              ? 'bg-amber-500 text-white border-amber-600'
+              ? 'bg-amber-500 text-white border-amber-600 shadow-2xs'
               : 'bg-elevated border-line text-ink-muted hover:text-ink'
           }`}
-          title="Mark urgent"
+          title="Toggle urgent priority"
+          aria-pressed={isUrgent}
         >
           !
         </button>
@@ -73,37 +99,41 @@ export const QuickTodoSection: React.FC<QuickTodoSectionProps> = ({
       </form>
 
       {/* Todo Checklist */}
-      <div className="space-y-1.5 max-h-[380px] overflow-y-auto pr-1">
-        {todos.length === 0 ? (
-          <p className="text-xs text-ink-muted italic py-6 text-center">
-            All caught up! Type an action item above to capture tasks.
-          </p>
+      <div className="space-y-1.5 flex-1 overflow-y-auto pr-1 min-h-0">
+        {filteredTodos.length === 0 ? (
+          <div className="h-full min-h-[200px] rounded-xl border border-dashed border-line/70 flex flex-col items-center justify-center p-6 text-center gap-1.5">
+            <IconCheckSquare className="w-5 h-5 text-ink-subtle" />
+            <p className="text-xs font-medium text-ink-muted">Scratchpad is clear</p>
+            <p className="text-[11px] text-ink-subtle">
+              Type an immediate task above to keep your daily focus sharp.
+            </p>
+          </div>
         ) : (
-          todos.map((item) => (
+          filteredTodos.map((item) => (
             <div
               key={item.id}
               onClick={() => onToggleTodo(item.id)}
-              className={`flex items-start gap-2.5 p-2.5 rounded-xl border transition-all cursor-pointer group text-xs ${
+              className={`flex items-start gap-2.5 p-3 rounded-xl border transition-all cursor-pointer group text-xs ${
                 item.completed
-                  ? 'border-line/40 bg-elevated/40 opacity-60'
-                  : 'border-line bg-canvas/60 hover:bg-canvas hover:border-blue/40'
+                  ? 'border-line/40 bg-elevated/30 opacity-60'
+                  : 'border-line bg-canvas/50 hover:bg-canvas/90 hover:border-blue/40'
               }`}
             >
               <input
                 type="checkbox"
                 checked={item.completed}
                 onChange={() => {}}
-                className="mt-0.5 rounded text-blue cursor-pointer"
+                className="mt-0.5 rounded text-blue cursor-pointer shrink-0"
               />
               <span
-                className={`flex-1 min-w-0 ${
+                className={`flex-1 min-w-0 leading-snug ${
                   item.completed ? 'line-through text-ink-muted' : 'text-ink font-medium'
                 }`}
               >
                 {item.text}
               </span>
               {item.priority === 'urgent' && !item.completed && (
-                <span className="text-[9px] font-mono font-bold uppercase text-amber-500 px-1.5 py-0.2 rounded bg-amber-500/10 shrink-0">
+                <span className="text-[9px] font-mono font-bold uppercase text-amber-500 px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 shrink-0">
                   Urgent
                 </span>
               )}
@@ -113,10 +143,11 @@ export const QuickTodoSection: React.FC<QuickTodoSectionProps> = ({
                   e.stopPropagation();
                   onDeleteTodo(item.id);
                 }}
-                className="opacity-0 group-hover:opacity-100 text-[10px] text-ink-muted hover:text-red-500 transition-opacity cursor-pointer p-0.5"
+                className="opacity-0 group-hover:opacity-100 w-6 h-6 rounded-md bg-surface border border-line text-ink-muted hover:text-red-500 hover:border-red-500/30 transition-opacity cursor-pointer flex items-center justify-center shrink-0"
                 title="Delete task"
+                aria-label="Delete task"
               >
-                ✕
+                <IconTrash className="w-3 h-3" />
               </button>
             </div>
           ))
@@ -124,16 +155,18 @@ export const QuickTodoSection: React.FC<QuickTodoSectionProps> = ({
       </div>
 
       {/* Progress Bar Footer */}
-      {todos.length > 0 && (
-        <div className="pt-2 border-t border-line/60">
-          <div className="w-full bg-elevated rounded-full h-1 overflow-hidden">
-            <div
-              className="bg-emerald-500 h-1 rounded-full transition-all duration-300"
-              style={{ width: `${(doneCount / todos.length) * 100}%` }}
-            />
-          </div>
+      <div className="pt-2.5 border-t border-line/60 shrink-0 space-y-1.5">
+        <div className="flex items-center justify-between text-[10px] font-mono text-ink-muted">
+          <span>Daily Execution</span>
+          <span className="font-bold text-emerald-500">{pct}% completed</span>
         </div>
-      )}
+        <div className="w-full bg-elevated rounded-full h-1.5 overflow-hidden">
+          <div
+            className="bg-emerald-500 h-1.5 rounded-full transition-all duration-300"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      </div>
     </div>
   );
 };

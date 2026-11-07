@@ -81,11 +81,38 @@ export const ReanalyzeProjectModal: React.FC<ReanalyzeProjectModalProps> = ({
     }
   };
 
-  const handleBackdropClick = (e: React.MouseEvent<HTMLDialogElement>) => {
-    if (e.target === dialogRef.current) {
-      onClose();
-    }
-  };
+  // Safari fallback for closedby="any" light dismiss using pointer bounds
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog || 'closedBy' in HTMLDialogElement.prototype) return;
+
+    const outside = (e: PointerEvent, el: HTMLDialogElement) => {
+      const r = el.getBoundingClientRect();
+      return (
+        e.clientX < r.left ||
+        e.clientX > r.right ||
+        e.clientY < r.top ||
+        e.clientY > r.bottom
+      );
+    };
+
+    let pressedOutside = false;
+    const onPointerDown = (e: PointerEvent) => {
+      pressedOutside = outside(e, dialog);
+    };
+    const onPointerUp = (e: PointerEvent) => {
+      if (pressedOutside && outside(e, dialog)) {
+        dialog.close();
+      }
+    };
+
+    dialog.addEventListener('pointerdown', onPointerDown);
+    dialog.addEventListener('pointerup', onPointerUp);
+    return () => {
+      dialog.removeEventListener('pointerdown', onPointerDown);
+      dialog.removeEventListener('pointerup', onPointerUp);
+    };
+  }, []);
 
   const handleToggleDeliverable = (index: number) => {
     setSelectedDeliverables((prev) => {
@@ -149,8 +176,9 @@ export const ReanalyzeProjectModal: React.FC<ReanalyzeProjectModalProps> = ({
   return (
     <dialog
       ref={dialogRef}
-      onClick={handleBackdropClick}
+      aria-labelledby="reanalyze-modal-title"
       onClose={onClose}
+      {...({ closedby: 'any' } as any)}
       className="m-auto rounded-2xl border border-line bg-surface p-0 text-ink shadow-2xl backdrop:bg-slate-950/60 backdrop:backdrop-blur-sm max-w-xl w-full outline-none overflow-hidden"
     >
       <div className="p-6">
@@ -158,7 +186,7 @@ export const ReanalyzeProjectModal: React.FC<ReanalyzeProjectModalProps> = ({
         <div className="flex items-center justify-between pb-4 border-b border-line">
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-base font-bold text-ink">
+              <h2 id="reanalyze-modal-title" className="text-base font-bold text-ink">
                 Codebase Pulse Analysis
               </h2>
               <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-blue/10 text-blue border border-blue/20">

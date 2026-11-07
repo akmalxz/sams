@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Project, ProjectStatus, ProjectTask } from '../../types/sams';
 import { parseGitHubRepo, fetchGitHubRepoPulse, GitHubPulseResult } from '../../utils/githubSync';
+import { IconArchiveBox, IconCheck, IconClose, IconCloudSync, IconPulse } from '../ui/Icons';
 
 interface ProjectRadarCardProps {
   project: Project;
@@ -28,27 +29,32 @@ export const ProjectRadarCard: React.FC<ProjectRadarCardProps> = ({
   const [newTaskInput, setNewTaskInput] = useState('');
   const [isAddingTask, setIsAddingTask] = useState(false);
 
+  // Non-blocking inline confirmation state (replaces window.confirm)
+  const [confirmAction, setConfirmAction] = useState<'archive' | 'unlink' | null>(null);
+
   // GitHub Sync State
   const [isSyncingGitHub, setIsSyncingGitHub] = useState(false);
   const [gitHubSyncMsg, setGitHubSyncMsg] = useState<string | null>(null);
   const [isEditingGitHubRepo, setIsEditingGitHubRepo] = useState(false);
   const [gitHubInput, setGitHubInput] = useState(
     project.githubRepo ||
-      (project.git?.remoteUrl ? parseGitHubRepo(project.git.remoteUrl)?.owner + '/' + parseGitHubRepo(project.git.remoteUrl)?.repo : '')
+      (project.git?.remoteUrl
+        ? parseGitHubRepo(project.git.remoteUrl)?.owner +
+          '/' +
+          parseGitHubRepo(project.git.remoteUrl)?.repo
+        : '')
   );
 
   const isClean = (project.git?.uncommittedChanges ?? 0) === 0;
   const tasks = project.tasks || [];
-  const openTasks = tasks.filter((t) => t.status !== 'done');
   const doneTasks = tasks.filter((t) => t.status === 'done');
+  const pct = tasks.length > 0 ? Math.round((doneTasks.length / tasks.length) * 100) : 0;
 
-  // Resolved GitHub Repo info
-  const resolvedRepo =
-    project.githubRepo
-      ? parseGitHubRepo(project.githubRepo)
-      : project.git?.remoteUrl
-        ? parseGitHubRepo(project.git.remoteUrl)
-        : null;
+  const resolvedRepo = project.githubRepo
+    ? parseGitHubRepo(project.githubRepo)
+    : project.git?.remoteUrl
+      ? parseGitHubRepo(project.git.remoteUrl)
+      : null;
 
   const handleSaveFocus = (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,7 +71,6 @@ export const ProjectRadarCard: React.FC<ProjectRadarCardProps> = ({
     setIsAddingTask(false);
   };
 
-  // Direct GitHub API Sync (100% Serverless)
   const handleGitHubPulse = async () => {
     const target = resolvedRepo || parseGitHubRepo(gitHubInput);
     if (!target) {
@@ -94,10 +99,10 @@ export const ProjectRadarCard: React.FC<ProjectRadarCardProps> = ({
         });
       }
 
-      setGitHubSyncMsg(`Synced commit ${pulse.lastCommitHash} from GitHub!`);
-      setTimeout(() => setGitHubSyncMsg(null), 4000);
+      setGitHubSyncMsg(`Synced ${pulse.lastCommitHash} from GitHub`);
+      setTimeout(() => setGitHubSyncMsg(null), 3500);
     } catch (err: any) {
-      setGitHubSyncMsg(`GitHub error: ${err.message}`);
+      setGitHubSyncMsg(`Sync error: ${err.message}`);
     } finally {
       setIsSyncingGitHub(false);
     }
@@ -120,104 +125,146 @@ export const ProjectRadarCard: React.FC<ProjectRadarCardProps> = ({
     switch (status) {
       case 'on_track':
         return (
-          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-            ● On Track
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            On Track
           </span>
         );
       case 'at_risk':
         return (
-          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-            ▲ In Progress
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+            At Risk
           </span>
         );
       case 'blocked':
         return (
-          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
-            ✕ Blocked
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+            Blocked
           </span>
         );
       case 'completed':
         return (
-          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue/10 text-blue border border-blue/20">
-            ✓ Done
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-blue/10 text-blue border border-blue/20 flex items-center gap-1">
+            <IconCheck className="w-2.5 h-2.5" />
+            Shipped
           </span>
         );
     }
   };
 
   return (
-    <div className="rounded-2xl border border-line bg-surface p-5 shadow-xs transition-all hover:border-blue/40 flex flex-col gap-4">
-      {/* 1. Header: Project Title & Quick Stats */}
-      <div className="flex items-start justify-between gap-3">
+    <div className="rounded-xl border border-line bg-canvas/50 hover:bg-canvas/80 p-4 transition-all hover:border-blue/40 flex flex-col gap-3">
+      {/* 1. Header: Project Title & Quick Action Controls */}
+      <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="flex items-center gap-2.5">
-            <h3 className="text-base font-bold text-ink tracking-tight truncate">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="text-sm font-bold text-ink tracking-tight truncate">
               {project.name}
             </h3>
             {getStatusBadge(project.status)}
           </div>
-          <p className="text-[11px] font-mono text-ink-muted truncate mt-0.5" title={project.workspacePath}>
+          <p
+            className="text-[11px] font-mono text-ink-muted truncate mt-0.5"
+            title={project.workspacePath}
+          >
             {project.workspacePath}
           </p>
         </div>
 
-        {/* Sync Pulse & Unlink Buttons */}
-        <div className="flex items-center gap-1.5 shrink-0">
+        {/* Action Bar */}
+        <div className="flex items-center gap-1 shrink-0">
           {resolvedRepo && (
             <button
               type="button"
               disabled={isSyncingGitHub}
               onClick={handleGitHubPulse}
-              className="px-2.5 py-1 rounded-lg border border-line bg-elevated hover:bg-surface hover:border-blue/50 text-[11px] font-semibold text-ink-muted hover:text-blue transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50"
+              className="px-2 py-1 rounded-lg border border-line bg-surface hover:border-blue/50 text-[11px] font-semibold text-ink-muted hover:text-blue transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50"
               title="Sync latest commits directly from GitHub API"
             >
-              {isSyncingGitHub ? (
-                <span className="animate-spin text-xs">⟳</span>
-              ) : (
-                <span className="text-blue font-bold">☁</span>
-              )}
-              <span className="hidden sm:inline">GitHub Sync</span>
+              <IconCloudSync className={`w-3.5 h-3.5 text-blue ${isSyncingGitHub ? 'animate-spin' : ''}`} />
+              <span className="hidden xl:inline">Sync</span>
             </button>
           )}
 
           <button
             type="button"
             onClick={() => onSyncPulse(project)}
-            className="px-2.5 py-1 rounded-lg border border-line bg-elevated hover:bg-surface hover:border-blue/50 text-[11px] font-semibold text-ink-muted hover:text-blue transition-colors cursor-pointer flex items-center gap-1"
+            className="px-2 py-1 rounded-lg border border-line bg-surface hover:border-blue/50 text-[11px] font-semibold text-ink-muted hover:text-blue transition-colors cursor-pointer flex items-center gap-1"
             title="Auto-analyze and refresh Git/codebase status"
           >
-            <span className="text-blue font-bold">⚡</span> Pulse
+            <IconPulse className="w-3.5 h-3.5 text-blue" />
+            <span>Pulse</span>
           </button>
 
           {onArchiveProject && (
             <button
               type="button"
-              onClick={() => {
-                if (confirm(`Archive ${project.name} to P.A.R.A. Archives?`)) {
-                  onArchiveProject(project);
-                }
-              }}
-              className="w-7 h-7 rounded-lg border border-line bg-elevated hover:bg-surface hover:border-purple-500/50 text-ink-muted hover:text-purple-500 text-xs transition-colors cursor-pointer flex items-center justify-center"
+              onClick={() => setConfirmAction(confirmAction === 'archive' ? null : 'archive')}
+              className={`w-7 h-7 rounded-lg border transition-colors cursor-pointer flex items-center justify-center ${
+                confirmAction === 'archive'
+                  ? 'border-purple-500 bg-purple-500/10 text-purple-500'
+                  : 'border-line bg-surface text-ink-muted hover:border-purple-500/50 hover:text-purple-500'
+              }`}
               title="Archive project to P.A.R.A. Archives"
+              aria-label={`Archive ${project.name}`}
             >
-              📦
+              <IconArchiveBox className="w-3.5 h-3.5" />
             </button>
           )}
 
           <button
             type="button"
-            onClick={() => {
-              if (confirm(`Unlink ${project.name} from SAMS? Your local files will not be deleted.`)) {
-                onUnlinkProject(project.id);
-              }
-            }}
-            className="w-7 h-7 rounded-lg border border-line bg-elevated hover:bg-red-500/10 hover:border-red-500/30 text-ink-muted hover:text-red-500 text-xs transition-colors cursor-pointer flex items-center justify-center"
+            onClick={() => setConfirmAction(confirmAction === 'unlink' ? null : 'unlink')}
+            className={`w-7 h-7 rounded-lg border transition-colors cursor-pointer flex items-center justify-center ${
+              confirmAction === 'unlink'
+                ? 'border-red-500 bg-red-500/10 text-red-500'
+                : 'border-line bg-surface text-ink-muted hover:border-red-500/40 hover:text-red-500'
+            }`}
             title="Unlink project"
+            aria-label={`Unlink ${project.name}`}
           >
-            ✕
+            <IconClose className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
+
+      {/* Inline Non-Blocking Confirmation Bar (Replaces ugly browser confirm()) */}
+      {confirmAction && (
+        <div className="px-3 py-2 rounded-lg bg-elevated border border-line flex items-center justify-between gap-2 text-xs">
+          <span className="text-ink font-medium">
+            {confirmAction === 'archive'
+              ? `Move "${project.name}" to Archives?`
+              : `Unlink "${project.name}" from SAMS?`}
+          </span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => setConfirmAction(null)}
+              className="px-2 py-0.5 rounded bg-surface border border-line text-[11px] text-ink-muted hover:text-ink cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (confirmAction === 'archive' && onArchiveProject) {
+                  onArchiveProject(project);
+                } else if (confirmAction === 'unlink') {
+                  onUnlinkProject(project.id);
+                }
+                setConfirmAction(null);
+              }}
+              className={`px-2.5 py-0.5 rounded text-[11px] font-semibold text-white cursor-pointer ${
+                confirmAction === 'archive' ? 'bg-purple-600 hover:bg-purple-500' : 'bg-red-600 hover:bg-red-500'
+              }`}
+            >
+              {confirmAction === 'archive' ? 'Archive' : 'Unlink'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* GitHub Sync Status Notification */}
       {gitHubSyncMsg && (
@@ -227,18 +274,19 @@ export const ProjectRadarCard: React.FC<ProjectRadarCardProps> = ({
             type="button"
             onClick={() => setGitHubSyncMsg(null)}
             className="text-xs text-blue hover:opacity-75 cursor-pointer ml-2"
+            aria-label="Dismiss message"
           >
-            ✕
+            <IconClose className="w-3 h-3" />
           </button>
         </div>
       )}
 
-      {/* 2. What We're Doing (Active Objective) */}
-      <div className="rounded-xl bg-elevated/70 border border-line/70 p-3.5 space-y-1.5">
+      {/* 2. Active Focus Objective */}
+      <div className="rounded-lg bg-surface border border-line/80 p-2.5 space-y-1">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-blue flex items-center gap-1.5">
+          <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-blue flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-blue" />
-            What We Are Doing
+            Active Focus
           </span>
           {!isEditingFocus && (
             <button
@@ -247,53 +295,54 @@ export const ProjectRadarCard: React.FC<ProjectRadarCardProps> = ({
                 setFocusInput(project.currentFocus || '');
                 setIsEditingFocus(true);
               }}
-              className="text-[10px] text-ink-muted hover:text-blue cursor-pointer"
+              className="text-[10px] font-mono text-ink-muted hover:text-blue cursor-pointer"
             >
-              ✎ Edit Focus
+              Edit
             </button>
           )}
         </div>
 
         {isEditingFocus ? (
-          <form onSubmit={handleSaveFocus} className="flex gap-2 pt-1">
+          <form onSubmit={handleSaveFocus} className="flex gap-1.5 pt-1">
             <input
               type="text"
               autoFocus
               value={focusInput}
               onChange={(e) => setFocusInput(e.target.value)}
-              placeholder="e.g. Implement user dashboard & modern analytics tab"
-              className="flex-1 rounded-lg border border-line bg-canvas px-2.5 py-1.5 text-xs text-ink placeholder:text-ink-subtle focus:border-blue focus:outline-none"
+              placeholder="Define active objective..."
+              className="flex-1 rounded-lg border border-line bg-canvas px-2.5 py-1 text-xs text-ink placeholder:text-ink-subtle focus:border-blue focus:outline-none"
             />
             <button
               type="submit"
-              className="rounded-lg bg-blue px-3 py-1.5 text-xs font-semibold text-white hover:opacity-95 cursor-pointer"
+              className="rounded-lg bg-blue px-2.5 py-1 text-xs font-semibold text-white cursor-pointer"
             >
               Save
             </button>
             <button
               type="button"
               onClick={() => setIsEditingFocus(false)}
-              className="rounded-lg bg-elevated px-2 py-1.5 text-xs text-ink-muted hover:text-ink cursor-pointer"
+              className="rounded-lg bg-elevated px-2 py-1 text-xs text-ink-muted hover:text-ink cursor-pointer"
             >
               Cancel
             </button>
           </form>
         ) : (
-          <p className="text-xs text-ink font-medium leading-relaxed">
+          <p className="text-xs text-ink font-medium leading-snug">
             {project.currentFocus || 'No active focus objective defined.'}
           </p>
         )}
       </div>
 
-      {/* 3. How We're Doing (Git Status & Latest Accomplishment) */}
-      <div className="rounded-xl bg-canvas border border-line p-3 space-y-2 text-xs font-mono">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+      {/* 3. Git Telemetry Strip */}
+      <div className="rounded-lg bg-surface border border-line/80 px-2.5 py-2 space-y-1.5 text-[11px] font-mono">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5">
             <span className={`w-2 h-2 rounded-full ${isClean ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-            <span className="text-ink">git: <strong>{project.git?.branch || 'main'}</strong></span>
+            <span className="text-ink-muted">
+              branch: <strong className="text-ink">{project.git?.branch || 'main'}</strong>
+            </span>
           </div>
 
-          {/* GitHub Repo Link / Connect Pill */}
           {resolvedRepo ? (
             <a
               href={`https://github.com/${resolvedRepo.owner}/${resolvedRepo.repo}`}
@@ -302,10 +351,16 @@ export const ProjectRadarCard: React.FC<ProjectRadarCardProps> = ({
               className="text-[11px] text-blue hover:underline flex items-center gap-1 shrink-0"
               title="Open repository on GitHub"
             >
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-                <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+              <svg aria-hidden="true" className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                <path
+                  fillRule="evenodd"
+                  clipRule="evenodd"
+                  d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
+                />
               </svg>
-              <span>{resolvedRepo.owner}/{resolvedRepo.repo}</span>
+              <span>
+                {resolvedRepo.owner}/{resolvedRepo.repo}
+              </span>
             </a>
           ) : isEditingGitHubRepo ? (
             <form onSubmit={handleSaveGitHubRepo} className="flex items-center gap-1">
@@ -315,99 +370,98 @@ export const ProjectRadarCard: React.FC<ProjectRadarCardProps> = ({
                 placeholder="owner/repo"
                 value={gitHubInput}
                 onChange={(e) => setGitHubInput(e.target.value)}
-                className="w-28 px-1.5 py-0.5 text-[10px] rounded border border-line bg-surface text-ink"
+                className="w-28 px-1.5 py-0.5 text-[10px] rounded border border-line bg-canvas text-ink"
               />
               <button
                 type="submit"
                 className="px-1.5 py-0.5 rounded bg-blue text-white text-[10px] font-bold"
               >
-                ✓
+                Save
               </button>
             </form>
           ) : (
             <button
               type="button"
               onClick={() => setIsEditingGitHubRepo(true)}
-              className="text-[10px] text-ink-muted hover:text-blue flex items-center gap-1 cursor-pointer"
+              className="text-[10px] text-ink-muted hover:text-blue cursor-pointer"
             >
-              <span>+ Link GitHub</span>
+              + Link GitHub
             </button>
           )}
         </div>
 
-        {/* Commit Hash and Message */}
-        {project.git?.lastCommitMessage ? (
-          <div className="text-[11px] text-ink-muted truncate border-t border-line/60 pt-1.5 flex items-center gap-1.5">
-            <span className="text-emerald-500 font-bold">✓</span>
-            <span className="text-ink font-semibold">{project.git.lastCommitHash}</span>
+        {project.git?.lastCommitMessage && (
+          <div className="text-[11px] text-ink-muted truncate border-t border-line/60 pt-1 flex items-center gap-1.5">
+            <IconCheck className="w-3 h-3 text-emerald-500 shrink-0" />
+            <span className="text-ink font-semibold shrink-0">{project.git.lastCommitHash}</span>
             <span>·</span>
-            <span className="text-ink truncate">{project.git.lastCommitMessage}</span>
-          </div>
-        ) : (
-          <div className="text-[11px] text-ink-muted border-t border-line/60 pt-1.5">
-            No commits recorded yet. Click "☁ GitHub Sync" or "⚡ Pulse" to fetch.
+            <span className="text-ink-muted truncate">{project.git.lastCommitMessage}</span>
           </div>
         )}
       </div>
 
-      {/* 4. What's Next (Next Deliverables) */}
-      <div className="space-y-2 pt-1">
+      {/* 4. Deliverables & Progress Bar */}
+      <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-muted">
-            Next Deliverables ({doneTasks.length}/{tasks.length})
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-ink-muted">
+              Deliverables ({doneTasks.length}/{tasks.length})
+            </span>
+            <span className="text-[10px] font-mono font-bold text-blue">{pct}%</span>
+          </div>
           {!isAddingTask && (
             <button
               type="button"
               onClick={() => setIsAddingTask(true)}
-              className="text-[11px] font-medium text-blue hover:underline cursor-pointer flex items-center gap-0.5"
+              className="text-[11px] font-semibold text-blue hover:underline cursor-pointer"
             >
-              <span>+</span> Add Task
+              + Task
             </button>
           )}
         </div>
 
-        {/* Task List */}
-        <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
-          {tasks.length === 0 ? (
-            <p className="text-xs text-ink-muted italic py-1">
-              No tasks defined yet. Click "+ Add Task" or run "⚡ Pulse" to auto-import.
-            </p>
-          ) : (
-            tasks.map((task) => (
-              <div
-                key={task.id}
-                onClick={() => onToggleTask(project.id, task)}
-                className={`flex items-start gap-2 p-2 rounded-lg border transition-colors cursor-pointer text-xs ${
-                  task.status === 'done'
-                    ? 'border-line/40 bg-elevated/40 opacity-60'
-                    : 'border-line bg-surface hover:border-blue/50'
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={task.status === 'done'}
-                  onChange={() => {}}
-                  className="mt-0.5 rounded text-blue cursor-pointer"
-                />
-                <span
-                  className={`flex-1 min-w-0 truncate ${
-                    task.status === 'done' ? 'line-through text-ink-muted' : 'text-ink font-medium'
-                  }`}
-                >
-                  {task.title.replace(/\*\*/g, '')}
-                </span>
-                {task.priority === 'high' && task.status !== 'done' && (
-                  <span className="text-[9px] font-mono font-bold uppercase text-amber-500 px-1 rounded bg-amber-500/10">
-                    High
-                  </span>
-                )}
-              </div>
-            ))
-          )}
+        {/* Slim Progress Bar */}
+        <div className="w-full bg-elevated rounded-full h-1.5 overflow-hidden">
+          <div
+            className="bg-blue h-1.5 rounded-full transition-all duration-300"
+            style={{ width: `${pct}%` }}
+          />
         </div>
 
-        {/* Inline Add Task Form */}
+        {/* Compact Task List */}
+        <div className="space-y-1 max-h-32 overflow-y-auto pr-0.5">
+          {tasks.map((task) => (
+            <div
+              key={task.id}
+              onClick={() => onToggleTask(project.id, task)}
+              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border transition-colors cursor-pointer text-xs ${
+                task.status === 'done'
+                  ? 'border-line/40 bg-elevated/30 opacity-60'
+                  : 'border-line bg-surface hover:border-blue/50'
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={task.status === 'done'}
+                onChange={() => {}}
+                className="rounded text-blue cursor-pointer shrink-0"
+              />
+              <span
+                className={`flex-1 min-w-0 truncate ${
+                  task.status === 'done' ? 'line-through text-ink-muted' : 'text-ink font-medium'
+                }`}
+              >
+                {task.title.replace(/\*\*/g, '')}
+              </span>
+              {task.priority === 'high' && task.status !== 'done' && (
+                <span className="text-[9px] font-mono font-bold uppercase text-amber-500 px-1.5 py-0.2 rounded bg-amber-500/10 shrink-0">
+                  High
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+
         {isAddingTask && (
           <form onSubmit={handleCreateTask} className="flex gap-1.5 pt-1">
             <input
@@ -416,7 +470,7 @@ export const ProjectRadarCard: React.FC<ProjectRadarCardProps> = ({
               value={newTaskInput}
               onChange={(e) => setNewTaskInput(e.target.value)}
               placeholder="Enter next deliverable..."
-              className="flex-1 rounded-lg border border-line bg-canvas px-2.5 py-1 text-xs text-ink placeholder:text-ink-subtle focus:border-blue focus:outline-none"
+              className="flex-1 rounded-lg border border-line bg-surface px-2.5 py-1 text-xs text-ink placeholder:text-ink-subtle focus:border-blue focus:outline-none"
             />
             <button
               type="submit"
@@ -428,29 +482,12 @@ export const ProjectRadarCard: React.FC<ProjectRadarCardProps> = ({
               type="button"
               onClick={() => setIsAddingTask(false)}
               className="rounded-lg bg-elevated px-2 py-1 text-xs text-ink-muted cursor-pointer"
+              aria-label="Cancel adding task"
             >
-              ✕
+              <IconClose className="w-3 h-3" />
             </button>
           </form>
         )}
-      </div>
-
-      {/* Progress Bar Footer */}
-      <div className="pt-2 border-t border-line/60">
-        <div className="flex items-center justify-between text-[10px] font-mono text-ink-muted mb-1">
-          <span>Progress</span>
-          <span className="font-semibold text-ink">
-            {tasks.length > 0 ? Math.round((doneTasks.length / tasks.length) * 100) : 0}%
-          </span>
-        </div>
-        <div className="w-full bg-elevated rounded-full h-1.5 overflow-hidden border border-line/40">
-          <div
-            className="bg-blue h-1.5 rounded-full transition-all duration-300"
-            style={{
-              width: `${tasks.length > 0 ? (doneTasks.length / tasks.length) * 100 : 0}%`,
-            }}
-          />
-        </div>
       </div>
     </div>
   );
