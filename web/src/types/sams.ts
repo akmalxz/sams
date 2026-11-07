@@ -49,6 +49,23 @@ export type ProjectStatus = 'on_track' | 'at_risk' | 'blocked' | 'completed';
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
 export type ProjectTaskStatus = 'backlog' | 'in_progress' | 'review' | 'done';
 
+export interface LearningNote {
+  id: string;
+  title: string;
+  note: string;
+  category: 'insight' | 'bugfix' | 'architecture' | 'command';
+  projectName?: string;
+  createdAt: number;
+}
+
+export interface QuickTodoItem {
+  id: string;
+  text: string;
+  completed: boolean;
+  priority?: 'normal' | 'urgent';
+  createdAt: number;
+}
+
 export interface ProjectTask {
   id: string;
   projectId: string;

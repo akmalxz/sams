@@ -1,6 +1,9 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Project, ProjectTask, ProjectTaskStatus } from './types/sams';
+import { Project, ProjectTask, ProjectTaskStatus, LearningNote, QuickTodoItem } from './types/sams';
 import { ProjectRadarCard } from './components/projects/ProjectRadarCard';
+import { LearnSection } from './components/learn/LearnSection';
+import { QuickTodoSection } from './components/todo/QuickTodoSection';
+import { UnifiedKanbanBoard } from './components/kanban/UnifiedKanbanBoard';
 import { LinkProjectDialog } from './components/projects/LinkProjectDialog';
 import { ReanalyzeProjectModal } from './components/projects/ReanalyzeProjectModal';
 import { ThreeBotCanvas, BotMood } from './components/bot/ThreeBotCanvas';
@@ -35,7 +38,7 @@ export function App() {
       githubRepo: 'akmalxz/sams',
       description: 'SAMS Multi-Project Command Centre & 3D Spatial Agent',
       status: 'on_track',
-      currentFocus: 'Rebuild simple Project Radar & deploy interactive 3D Bot to GitHub Pages',
+      currentFocus: '3-tier layout: Projects | Learn | To do with Unified Cross-Project Kanban',
       progressPercent: 75,
       createdAt: Date.now() - 86400000,
       updatedAt: Date.now(),
@@ -43,16 +46,16 @@ export function App() {
         isGitRepo: true,
         branch: 'main',
         uncommittedChanges: 0,
-        lastCommitHash: '1b510f8',
-        lastCommitMessage: 'fix(ci): enable auto-enablement on configure-pages',
+        lastCommitHash: '5c8c3f8',
+        lastCommitMessage: 'feat(github): add serverless direct GitHub API commit & repo pulse sync',
         remoteUrl: 'https://github.com/akmalxz/sams.git',
       },
       tasks: [
         {
           id: 't-1',
           projectId: 'personal-ai-platform',
-          title: 'Rebuild simple project tracking cards',
-          status: 'done',
+          title: 'Split layout into Projects | Learn | To do',
+          status: 'in_progress',
           priority: 'high',
           createdAt: Date.now(),
           updatedAt: Date.now(),
@@ -60,8 +63,8 @@ export function App() {
         {
           id: 't-2',
           projectId: 'personal-ai-platform',
-          title: 'Procedural 3D SAM Bot with cursor gaze tracking',
-          status: 'done',
+          title: 'Implement Unified Cross-Project Kanban Board',
+          status: 'in_progress',
           priority: 'high',
           createdAt: Date.now(),
           updatedAt: Date.now(),
@@ -71,15 +74,6 @@ export function App() {
           projectId: 'personal-ai-platform',
           title: 'Publish to GitHub Pages via automated Actions workflow',
           status: 'done',
-          priority: 'high',
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        },
-        {
-          id: 't-4',
-          projectId: 'personal-ai-platform',
-          title: 'Serverless GitHub API direct pulse synchronization',
-          status: 'in_progress',
           priority: 'high',
           createdAt: Date.now(),
           updatedAt: Date.now(),
@@ -107,7 +101,7 @@ export function App() {
       },
       tasks: [
         {
-          id: 't-5',
+          id: 't-4',
           projectId: 'ewallet-app',
           title: 'Improve analytics in categories tab',
           status: 'done',
@@ -116,7 +110,7 @@ export function App() {
           updatedAt: Date.now(),
         },
         {
-          id: 't-6',
+          id: 't-5',
           projectId: 'ewallet-app',
           title: 'Add interactive budget drilldown widgets',
           status: 'backlog',
@@ -124,11 +118,53 @@ export function App() {
           createdAt: Date.now(),
           updatedAt: Date.now(),
         },
+        {
+          id: 't-6',
+          projectId: 'ewallet-app',
+          title: 'Review transaction categorizer model',
+          status: 'review',
+          priority: 'low',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        },
       ],
     },
   ];
 
-  // Projects State
+  const DEFAULT_LEARNINGS: LearningNote[] = [
+    {
+      id: 'l-1',
+      title: 'Vite Relative Base for GitHub Pages',
+      note: "Always set base: './' in vite.config.ts so assets resolve on repository subpaths (e.g. /sams/).",
+      category: 'architecture',
+      projectName: 'SAMS',
+      createdAt: Date.now() - 3600000,
+    },
+    {
+      id: 'l-2',
+      title: 'Auto-Enablement on configure-pages Action',
+      note: "Set enablement: true on actions/configure-pages@v5 to avoid HttpError 404 when activating Pages.",
+      category: 'bugfix',
+      projectName: 'DevOps',
+      createdAt: Date.now() - 1800000,
+    },
+    {
+      id: 'l-3',
+      title: 'WebGL Visibility Lifecycle Guard',
+      note: 'Listen to document.hidden / visibilitychange to pause requestAnimationFrame and save unified memory.',
+      category: 'insight',
+      projectName: 'ThreeBot',
+      createdAt: Date.now() - 900000,
+    },
+  ];
+
+  const DEFAULT_TODOS: QuickTodoItem[] = [
+    { id: 'todo-1', text: 'Review 3-column Projects | Learn | To do layout', completed: true, priority: 'normal', createdAt: Date.now() },
+    { id: 'todo-2', text: 'Verify cross-project Kanban board task transitions', completed: false, priority: 'urgent', createdAt: Date.now() },
+    { id: 'todo-3', text: 'Push live build to GitHub Pages and test on mobile', completed: false, priority: 'normal', createdAt: Date.now() },
+  ];
+
+  // State Management
   const [projects, setProjects] = useState<Project[]>(() => {
     try {
       const saved = localStorage.getItem('sams-projects');
@@ -136,10 +172,26 @@ export function App() {
     } catch {}
     return DEFAULT_DEMO_PROJECTS;
   });
+
+  const [learnings, setLearnings] = useState<LearningNote[]>(() => {
+    try {
+      const saved = localStorage.getItem('sams-learnings');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return DEFAULT_LEARNINGS;
+  });
+
+  const [todos, setTodos] = useState<QuickTodoItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('sams-quick-todos');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return DEFAULT_TODOS;
+  });
+
   const [backendOnline, setBackendOnline] = useState(false);
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
   const [reanalyzingProject, setReanalyzingProject] = useState<Project | null>(null);
-  const [filterMode, setFilterMode] = useState<'all' | 'clean' | 'dirty'>('all');
 
   // Fetch Projects from Backend (with fallback to localStorage/demo)
   const fetchProjects = async () => {
@@ -167,11 +219,10 @@ export function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // Task & Project Actions (Dual-Mode: Backend API + LocalStorage fallback)
+  // --- Task & Project Handlers ---
   const handleToggleTask = async (projectId: string, task: ProjectTask) => {
     const nextStatus: ProjectTaskStatus = task.status === 'done' ? 'backlog' : 'done';
 
-    // Optimistic / Local update
     setProjects((prev) => {
       const updated = prev.map((p) => {
         if (p.id !== projectId) return p;
@@ -199,13 +250,49 @@ export function App() {
     }
   };
 
-  const handleAddTask = async (projectId: string, title: string) => {
+  const handleUpdateTaskStatus = async (
+    projectId: string,
+    taskId: string,
+    newStatus: ProjectTaskStatus
+  ) => {
+    setProjects((prev) => {
+      const updated = prev.map((p) => {
+        if (p.id !== projectId) return p;
+        const newTasks = (p.tasks || []).map((t) =>
+          t.id === taskId ? { ...t, status: newStatus } : t
+        );
+        return { ...p, tasks: newTasks };
+      });
+      try {
+        localStorage.setItem('sams-projects', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    if (backendOnline) {
+      try {
+        await fetch(`/api/projects/${projectId}/tasks/${taskId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: newStatus }),
+        });
+      } catch (err) {
+        console.error('Failed to update task status on backend:', err);
+      }
+    }
+  };
+
+  const handleAddTask = async (
+    projectId: string,
+    title: string,
+    status: ProjectTaskStatus = 'backlog'
+  ) => {
     const newTask: ProjectTask = {
       id: `task-${Date.now()}`,
       projectId,
       title,
       priority: 'medium',
-      status: 'backlog',
+      status,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -226,10 +313,31 @@ export function App() {
         await fetch(`/api/projects/${projectId}/tasks`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title, priority: 'medium', status: 'backlog' }),
+          body: JSON.stringify({ title, priority: 'medium', status }),
         });
       } catch (err) {
         console.error('Failed to create task on backend:', err);
+      }
+    }
+  };
+
+  const handleDeleteTask = async (projectId: string, taskId: string) => {
+    setProjects((prev) => {
+      const updated = prev.map((p) => {
+        if (p.id !== projectId) return p;
+        return { ...p, tasks: (p.tasks || []).filter((t) => t.id !== taskId) };
+      });
+      try {
+        localStorage.setItem('sams-projects', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    if (backendOnline) {
+      try {
+        await fetch(`/api/projects/${projectId}/tasks/${taskId}`, { method: 'DELETE' });
+      } catch (err) {
+        console.error('Failed to delete task on backend:', err);
       }
     }
   };
@@ -254,24 +362,6 @@ export function App() {
         });
       } catch (err) {
         console.error('Failed to update focus on backend:', err);
-      }
-    }
-  };
-
-  const handleUnlinkProject = async (projectId: string) => {
-    setProjects((prev) => {
-      const updated = prev.filter((p) => p.id !== projectId);
-      try {
-        localStorage.setItem('sams-projects', JSON.stringify(updated));
-      } catch {}
-      return updated;
-    });
-
-    if (backendOnline) {
-      try {
-        await fetch(`/api/projects/${projectId}`, { method: 'DELETE' });
-      } catch (err) {
-        console.error('Failed to unlink project on backend:', err);
       }
     }
   };
@@ -305,12 +395,94 @@ export function App() {
     }
   };
 
+  const handleUnlinkProject = async (projectId: string) => {
+    setProjects((prev) => {
+      const updated = prev.filter((p) => p.id !== projectId);
+      try {
+        localStorage.setItem('sams-projects', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    if (backendOnline) {
+      try {
+        await fetch(`/api/projects/${projectId}`, { method: 'DELETE' });
+      } catch (err) {
+        console.error('Failed to unlink project on backend:', err);
+      }
+    }
+  };
+
+  // --- Learning Notes Handlers ---
+  const handleAddLearning = (item: Omit<LearningNote, 'id' | 'createdAt'>) => {
+    const newNote: LearningNote = {
+      ...item,
+      id: `learn-${Date.now()}`,
+      createdAt: Date.now(),
+    };
+    setLearnings((prev) => {
+      const next = [newNote, ...prev];
+      try {
+        localStorage.setItem('sams-learnings', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const handleDeleteLearning = (id: string) => {
+    setLearnings((prev) => {
+      const next = prev.filter((l) => l.id !== id);
+      try {
+        localStorage.setItem('sams-learnings', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  // --- Quick Todos Handlers ---
+  const handleToggleTodo = (id: string) => {
+    setTodos((prev) => {
+      const next = prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t));
+      try {
+        localStorage.setItem('sams-quick-todos', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const handleAddTodo = (text: string, priority: 'normal' | 'urgent' = 'normal') => {
+    const newItem: QuickTodoItem = {
+      id: `todo-${Date.now()}`,
+      text,
+      completed: false,
+      priority,
+      createdAt: Date.now(),
+    };
+    setTodos((prev) => {
+      const next = [newItem, ...prev];
+      try {
+        localStorage.setItem('sams-quick-todos', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const handleDeleteTodo = (id: string) => {
+    setTodos((prev) => {
+      const next = prev.filter((t) => t.id !== id);
+      try {
+        localStorage.setItem('sams-quick-todos', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
   // Derive Bot Mood & Status Message
   const botTelemetry = useMemo(() => {
     if (projects.length === 0) {
       return {
         mood: 'focus' as BotMood,
-        message: 'Welcome! Click "+ Link Project" to begin tracking your local codebases.',
+        message: 'Welcome to SAMS! Click "+ Link Project" to track your codebases.',
       };
     }
 
@@ -325,32 +497,22 @@ export function App() {
     if (dirtyProjects.length > 0) {
       return {
         mood: 'dirty' as BotMood,
-        message: `Tracking ${projects.length} projects. ${dirtyProjects.length} ${
-          dirtyProjects.length === 1 ? 'project has' : 'projects have'
-        } uncommitted changes.`,
+        message: `Tracking ${projects.length} projects. ${dirtyProjects.length} with pending local changes. ${totalOpenTasks} open deliverables in Kanban.`,
       };
     }
 
     return {
       mood: 'clean' as BotMood,
       message: backendOnline
-        ? `Live Mac Backend: All ${projects.length} codebases clean and synced! ${totalOpenTasks} open deliverables.`
-        : `Interactive Web Mode: Tracking ${projects.length} codebases with 3D SAM! Run "bun run server" for live Mac Git sync.`,
+        ? `Live Mac Sync: All ${projects.length} codebases clean & synced! ${totalOpenTasks} deliverables in Kanban.`
+        : `Interactive Cloud Mode: Tracking ${projects.length} codebases with 3D SAM. Pull latest commits anytime via GitHub Sync!`,
     };
   }, [projects, backendOnline]);
-
-  // Filtered projects
-  const filteredProjects = projects.filter((p) => {
-    const isClean = (p.git?.uncommittedChanges ?? 0) === 0;
-    if (filterMode === 'clean') return isClean;
-    if (filterMode === 'dirty') return !isClean;
-    return true;
-  });
 
   return (
     <div className="min-h-screen bg-canvas text-ink font-sans transition-colors duration-200 flex flex-col">
       {/* 1. Slim Executive Navigation Header */}
-      <header className="border-b border-line bg-surface/90 backdrop-blur-md px-6 py-3 sticky top-0 z-30 flex items-center justify-between gap-4">
+      <header className="border-b border-line bg-surface/90 backdrop-blur-md px-5 py-2.5 sticky top-0 z-30 flex items-center justify-between gap-4">
         {/* Brand */}
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-xl bg-blue/10 border border-blue/20 flex items-center justify-center text-blue shadow-xs font-bold text-sm">
@@ -360,11 +522,11 @@ export function App() {
             <div className="flex items-center gap-2">
               <h1 className="font-bold text-sm tracking-tight text-ink">SAMS</h1>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue/10 text-blue font-semibold border border-blue/20">
-                Project Radar
+                Command Deck
               </span>
             </div>
             <p className="hidden sm:block text-[11px] text-ink-muted">
-              Spatial Agentic Management & Multi-Project Command Centre
+              Projects · Learn · To do · Cross-Project Kanban
             </p>
           </div>
         </div>
@@ -427,153 +589,128 @@ export function App() {
         </div>
       </header>
 
-      {/* 2. Main Dashboard Layout: Project Radar + 3D Bot Companion */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column (8 cols): Project Radar Cards */}
-        <div className="lg:col-span-8 space-y-5">
-          {/* Section Subheader & Filter Tabs */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-line">
-            <div>
-              <h2 className="text-base font-bold text-ink tracking-tight">
-                Active Codebases
-              </h2>
-              <p className="text-xs text-ink-muted">
-                Track what you are doing, real-time Git status, and immediate next deliverables.
-              </p>
-            </div>
-
-            {/* Quick Filters */}
-            <div className="flex rounded-lg border border-line bg-elevated/60 p-0.5 text-xs font-mono">
-              <button
-                type="button"
-                onClick={() => setFilterMode('all')}
-                className={`px-3 py-1 rounded-md cursor-pointer transition-colors ${
-                  filterMode === 'all'
-                    ? 'bg-surface text-ink font-bold shadow-2xs'
-                    : 'text-ink-muted hover:text-ink'
-                }`}
-              >
-                All ({projects.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setFilterMode('clean')}
-                className={`px-3 py-1 rounded-md cursor-pointer transition-colors ${
-                  filterMode === 'clean'
-                    ? 'bg-surface text-emerald-600 dark:text-emerald-400 font-bold shadow-2xs'
-                    : 'text-ink-muted hover:text-ink'
-                }`}
-              >
-                Clean ({projects.filter((p) => (p.git?.uncommittedChanges ?? 0) === 0).length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setFilterMode('dirty')}
-                className={`px-3 py-1 rounded-md cursor-pointer transition-colors ${
-                  filterMode === 'dirty'
-                    ? 'bg-surface text-amber-600 dark:text-amber-400 font-bold shadow-2xs'
-                    : 'text-ink-muted hover:text-ink'
-                }`}
-              >
-                Dirty ({projects.filter((p) => (p.git?.uncommittedChanges ?? 0) > 0).length})
-              </button>
-            </div>
-          </div>
-
-          {/* Project Radar Grid */}
-          {filteredProjects.length === 0 ? (
-            <div className="rounded-2xl border-2 border-dashed border-line p-12 text-center space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-blue/10 text-blue flex items-center justify-center mx-auto text-xl font-bold">
-                +
-              </div>
-              <h3 className="text-sm font-bold text-ink">No projects found</h3>
-              <p className="text-xs text-ink-muted max-w-sm mx-auto">
-                {projects.length === 0
-                  ? 'Link any local repository to track its current goals, commits, and Kanban deliverables.'
-                  : 'No projects match the selected filter.'}
-              </p>
-              {projects.length === 0 && (
-                <button
-                  type="button"
-                  onClick={() => setIsLinkDialogOpen(true)}
-                  className="mt-2 px-4 py-2 rounded-xl bg-blue text-white text-xs font-semibold hover:opacity-95 cursor-pointer shadow-sm"
-                >
-                  Link Your First Project
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-5">
-              {filteredProjects.map((project) => (
-                <ProjectRadarCard
-                  key={project.id}
-                  project={project}
-                  onToggleTask={handleToggleTask}
-                  onAddTask={handleAddTask}
-                  onUpdateFocus={handleUpdateFocus}
-                  onSyncPulse={(p) => setReanalyzingProject(p)}
-                  onUnlinkProject={handleUnlinkProject}
-                  onUpdateProject={handleUpdateProject}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Right Column (4 cols): 3D SAM Companion & Telemetry Deck */}
-        <div className="lg:col-span-4 space-y-5 sticky top-20">
-          {/* 3D Bot Card */}
-          <div className="rounded-2xl border border-line bg-surface p-5 shadow-xs flex flex-col items-center relative overflow-hidden">
-            <div className="w-full flex items-center justify-between pb-2 border-b border-line/60">
-              <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-ink flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-blue" />
-                SAM · 3D Agent
-              </span>
-              <span className="text-[10px] font-mono text-ink-muted">
-                Interactive Companion
-              </span>
-            </div>
-
-            {/* Three.js Canvas Container */}
-            <div className="w-full h-72">
+      {/* Main Container */}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
+        {/* Executive 3D SAM Companion Banner */}
+        <div className="p-4 rounded-2xl bg-surface border border-line shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-4 w-full sm:w-auto">
+            {/* 3D WebGL Canvas Container */}
+            <div className="w-20 h-20 sm:w-24 sm:h-24 shrink-0 rounded-2xl bg-canvas border border-line/60 relative overflow-hidden shadow-2xs">
               <ThreeBotCanvas
                 mood={botTelemetry.mood}
-                message={botTelemetry.message}
                 isDark={themeMode === 'dark'}
               />
             </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono font-bold uppercase tracking-wider text-blue">
+                  SAM · 3D Agent Companion
+                </span>
+                <span className="text-[10px] font-mono px-2 py-0.2 rounded-full bg-blue/10 text-blue font-semibold border border-blue/20">
+                  Gaze Tracking
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm font-medium text-ink mt-1 leading-relaxed">
+                {botTelemetry.message}
+              </p>
+            </div>
           </div>
 
-          {/* Quick Metrics Deck */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="rounded-xl border border-line bg-surface p-3 text-center">
-              <span className="text-[10px] font-mono text-ink-muted block uppercase">
-                Projects
-              </span>
-              <span className="text-xl font-bold text-ink mt-0.5 block">
-                {projects.length}
-              </span>
+          {/* Quick Metrics Pills */}
+          <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-center font-mono text-xs">
+            <div className="px-3 py-1.5 rounded-xl border border-line bg-canvas text-center">
+              <span className="text-[10px] text-ink-muted uppercase block">Projects</span>
+              <span className="font-bold text-ink">{projects.length}</span>
             </div>
-            <div className="rounded-xl border border-line bg-surface p-3 text-center">
-              <span className="text-[10px] font-mono text-ink-muted block uppercase">
-                Open Tasks
-              </span>
-              <span className="text-xl font-bold text-blue mt-0.5 block">
-                {projects.reduce(
-                  (acc, p) => acc + (p.tasks?.filter((t) => t.status !== 'done').length || 0),
-                  0
-                )}
-              </span>
+            <div className="px-3 py-1.5 rounded-xl border border-line bg-canvas text-center">
+              <span className="text-[10px] text-ink-muted uppercase block">Learnings</span>
+              <span className="font-bold text-purple-500">{learnings.length}</span>
             </div>
-            <div className="rounded-xl border border-line bg-surface p-3 text-center">
-              <span className="text-[10px] font-mono text-ink-muted block uppercase">
-                Clean Repos
-              </span>
-              <span className="text-xl font-bold text-emerald-500 mt-0.5 block">
-                {projects.filter((p) => (p.git?.uncommittedChanges ?? 0) === 0).length}
-              </span>
+            <div className="px-3 py-1.5 rounded-xl border border-line bg-canvas text-center">
+              <span className="text-[10px] text-ink-muted uppercase block">Todos</span>
+              <span className="font-bold text-emerald-500">{todos.filter((t) => !t.completed).length}</span>
             </div>
           </div>
+        </div>
+
+        {/* --- SECTION 1 (TOP TIER): 3 Columns [ Projects | Learn | To do ] --- */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+          {/* 1. Projects Column */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-line">
+              <div className="flex items-center gap-2">
+                <span className="text-blue font-bold">🔷</span>
+                <h2 className="text-sm font-bold text-ink tracking-tight">Projects</h2>
+                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-elevated border border-line text-ink-muted">
+                  {projects.length}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsLinkDialogOpen(true)}
+                className="text-xs font-semibold text-blue hover:underline cursor-pointer flex items-center gap-0.5"
+              >
+                <span>+</span> Link
+              </button>
+            </div>
+
+            {projects.length === 0 ? (
+              <div className="p-8 rounded-2xl border-2 border-dashed border-line text-center space-y-2">
+                <p className="text-xs text-ink-muted">No projects tracked yet.</p>
+                <button
+                  type="button"
+                  onClick={() => setIsLinkDialogOpen(true)}
+                  className="px-3 py-1.5 rounded-lg bg-blue text-white text-xs font-semibold shadow-xs"
+                >
+                  Link First Project
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {projects.map((project) => (
+                  <ProjectRadarCard
+                    key={project.id}
+                    project={project}
+                    onToggleTask={handleToggleTask}
+                    onAddTask={handleAddTask}
+                    onUpdateFocus={handleUpdateFocus}
+                    onSyncPulse={(p) => setReanalyzingProject(p)}
+                    onUnlinkProject={handleUnlinkProject}
+                    onUpdateProject={handleUpdateProject}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 2. Learn Column */}
+          <div>
+            <LearnSection
+              learnings={learnings}
+              onAddLearning={handleAddLearning}
+              onDeleteLearning={handleDeleteLearning}
+            />
+          </div>
+
+          {/* 3. To do Column */}
+          <div>
+            <QuickTodoSection
+              todos={todos}
+              onToggleTodo={handleToggleTodo}
+              onAddTodo={handleAddTodo}
+              onDeleteTodo={handleDeleteTodo}
+            />
+          </div>
+        </div>
+
+        {/* --- SECTION 2 (BOTTOM TIER): 1 Unified Cross-Project Kanban Board --- */}
+        <div>
+          <UnifiedKanbanBoard
+            projects={projects}
+            onUpdateTaskStatus={handleUpdateTaskStatus}
+            onAddTask={handleAddTask}
+            onDeleteTask={handleDeleteTask}
+          />
         </div>
       </main>
 
